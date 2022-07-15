@@ -7,7 +7,8 @@ import (
 )
 
 type Topic struct {
-	Path     string
+	Slug     string
+	URI      string
 	FilePath string
 	Title    string
 	Articles []*Article
@@ -19,19 +20,21 @@ func (i *Index) loadTopicFromFile(topicFilePath string) *Topic {
 		return nil
 	}
 
-	path, ok := headers["path"]
+	topicDirName := filepath.Base(filepath.Dir(topicFilePath))
+	slug, ok := headers["slug"]
 	if !ok {
-		path = filepath.Base(filepath.Dir(topicFilePath))
+		slug = strings.ToLower(topicDirName)
 	}
 
 	title, ok := headers["title"]
 	if !ok {
-		title = filepath.Base(filepath.Dir(topicFilePath))
+		title = topicDirName
 	}
 
 	topic := &Topic{
 		Title:    title,
-		Path:     strings.Trim(path, "/"),
+		URI:      filepath.Join("/", slug),
+		Slug:     strings.Trim(slug, "/"),
 		FilePath: topicFilePath,
 		Articles: []*Article{},
 	}
@@ -46,7 +49,7 @@ func (i *Index) loadTopicFromFile(topicFilePath string) *Topic {
 			continue
 		}
 
-		article := i.loadArticleFromPath(filepath.Join(filepath.Dir(topicFilePath), file.Name()))
+		article := i.loadArticleFromPath(filepath.Join(filepath.Dir(topicFilePath), file.Name()), topic.Slug)
 		if article != nil {
 			topic.Articles = append(topic.Articles, article)
 		}
@@ -59,20 +62,24 @@ func (i *Index) loadTopicFromFile(topicFilePath string) *Topic {
 	return topic
 }
 
-func (i *Index) GetTopic(path string) *Topic {
+func (i *Index) GetTopic(slug string) *Topic {
 	for _, topic := range i.topics {
-		if topic.Path == path {
+		if topic.Slug == slug {
 			return topic
 		}
 	}
 	return nil
 }
 
-func (t *Topic) GetArticle(path string) *Article {
+func (t *Topic) GetArticle(slug string) *Article {
 	for _, article := range t.Articles {
-		if article.Path == path {
+		if article.Slug == slug {
 			return article
 		}
 	}
 	return nil
+}
+
+func (t *Topic) GetURI() string {
+	return t.URI
 }

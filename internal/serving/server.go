@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -12,8 +11,14 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"github.com/rs/cors"
 	"github.com/wamphlett/blog-server/internal/indexing"
+	log "unknwon.dev/clog/v2"
 )
+
+type Metrics interface {
+	Request(uri string, startTime time.Time)
+}
 
 type FileReader interface {
 	ReadFile(filepath string) (string, error)
@@ -31,14 +36,39 @@ type Server struct {
 	srv              *http.Server
 	router           *mux.Router
 	overviewFilePath string
+	metrics          Metrics
+	port             int
+	allowedOrigins   []string
 }
 
-func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath string) *Server {
+type Option func(*Server)
+
+func WithPort(port int) Option {
+	return func(s *Server) {
+		s.port = port
+	}
+}
+
+func WithAllowedOrigins(origins []string) Option {
+	return func(s *Server) {
+		s.allowedOrigins = origins
+	}
+}
+
+func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath string, metrics Metrics, opts ...Option) *Server {
 	s := &Server{
 		reader:           reader,
 		index:            index,
 		router:           mux.NewRouter(),
 		overviewFilePath: filepath.Join(contentDir, overviewFilePath),
+		metrics:          metrics,
+		port:             3000,
+		allowedOrigins:   []string{},
+	}
+
+	// apply options
+	for _, opt := range opts {
+		opt(s)
 	}
 
 	// serve static files
@@ -50,13 +80,19 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 	s.router.HandleFunc("/topics/{topic}", s.getTopic)
 	s.router.HandleFunc("/topics/{topic}/articles", s.listArticles)
 	s.router.HandleFunc("/topics/{topic}/articles/{article}", s.getArticle)
+	s.router.Use(loggingMiddleware)
+	s.router.Use(s.recordingMiddleware)
+
+	c := cors.New(cors.Options{
+		AllowedOrigins: s.allowedOrigins,
+	})
 
 	s.srv = &http.Server{
-		Addr:         "0.0.0.0:3000",
+		Addr:         fmt.Sprintf("0.0.0.0:%d", s.port),
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
-		Handler:      s.router,
+		Handler:      c.Handler(s.router),
 	}
 
 	return s
@@ -140,10 +176,17 @@ func (s *Server) getTopic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// read the file
+	content, err := s.reader.ReadFile(topic.FilePath)
+	if err != nil {
+		s.internalError(w, r)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(GetTopicResponse{
 		convertTopic(topic),
-		HtmlResponse{"<div>some html</div>"},
+		HtmlResponse{content},
 	})
 }
 
@@ -155,6 +198,14 @@ func (s *Server) notFound(w http.ResponseWriter, r *http.Request) {
 func (s *Server) internalError(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusInternalServerError)
 	json.NewEncoder(w).Encode(ErrorResponse{"internal error"})
+}
+
+func (s *Server) recordingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		startTime := time.Now()
+		defer s.metrics.Request(r.RequestURI, startTime)
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) ListenAndServe() {
@@ -173,7 +224,7 @@ func (s *Server) Shutdown() {
 }
 
 func buildTopicUrl(topic *indexing.Topic) string {
-	return fmt.Sprintf("/topics/%s", topic.Path)
+	return fmt.Sprintf("/topics/%s", topic.Slug)
 }
 
 func buildTopicArticlesUrl(topic *indexing.Topic) string {
@@ -181,7 +232,7 @@ func buildTopicArticlesUrl(topic *indexing.Topic) string {
 }
 
 func buildArticleUrl(topic *indexing.Topic, article *indexing.Article) string {
-	return fmt.Sprintf("%s/%s", buildTopicArticlesUrl(topic), article.Path)
+	return fmt.Sprintf("%s/%s", buildTopicArticlesUrl(topic), article.Slug)
 }
 
 func convertTopic(topic *indexing.Topic) Topic {
@@ -190,6 +241,7 @@ func convertTopic(topic *indexing.Topic) Topic {
 			Title:    topic.Title,
 			URL:      buildTopicUrl(topic),
 			Priority: 0,
+			Slug:     topic.Slug,
 		},
 		buildTopicArticlesUrl(topic),
 	}
@@ -201,6 +253,7 @@ func convertArticle(topic *indexing.Topic, article *indexing.Article) Article {
 			Title:    article.Title,
 			URL:      buildArticleUrl(topic, article),
 			Priority: 0,
+			Slug:     article.Slug,
 		},
 	}
 }
@@ -212,6 +265,15 @@ func neuter(next http.Handler) http.Handler {
 			return
 		}
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Do stuff here
+		log.Info(r.RequestURI)
+		// Call the next handler, which can be another middleware in the chain, or the final handler.
 		next.ServeHTTP(w, r)
 	})
 }

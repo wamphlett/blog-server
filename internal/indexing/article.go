@@ -6,38 +6,46 @@ import (
 )
 
 type Article struct {
-	Path     string
+	Slug     string
+	URI      string
 	FilePath string
 	Title    string
 }
 
-func (i *Index) loadArticleFromPath(articleFilePath string) *Article {
+func (a *Article) GetURI() string {
+	return a.URI
+}
+
+func (i *Index) loadArticleFromPath(articleFilePath, topicSlug string) *Article {
 	headers := i.parseFileHeaders(articleFilePath)
 	if published, ok := headers["published"]; !ok || published != "true" {
 		return nil
 	}
-	path, ok := headers["path"]
+
+	fileName := strings.TrimRight(filepath.Base(articleFilePath), ".md")
+	slug, ok := headers["slug"]
 	if !ok {
-		path = filepath.Base(articleFilePath)
+		slug = strings.ToLower(fileName)
 	}
 	title, ok := headers["title"]
 	if !ok {
-		title = strings.TrimRight(filepath.Base(articleFilePath), ".md")
+		title = fileName
 	}
 	return &Article{
 		Title:    title,
-		Path:     path,
+		URI:      filepath.Join("/", topicSlug, slug),
+		Slug:     strings.Trim(slug, "/"),
 		FilePath: articleFilePath,
 	}
 }
 
-func (i *Index) GetArticle(topicPath, articlePath string) *Article {
-	topic := i.GetTopic(topicPath)
+func (i *Index) GetArticle(topicSlug, articleSlug string) *Article {
+	topic := i.GetTopic(topicSlug)
 	if topic == nil {
 		return nil
 	}
 	for _, article := range topic.Articles {
-		if article.Path == articlePath {
+		if article.Slug == articleSlug {
 			return article
 		}
 	}

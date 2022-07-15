@@ -4,6 +4,7 @@ type CommonItemResponse struct {
 	Title    string `json:"title"`
 	URL      string `json:"url"`
 	Priority int    `json:"priority"`
+	Slug     string `json:"slug"`
 }
 
 type HtmlResponse struct {

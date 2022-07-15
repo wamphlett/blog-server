@@ -2,27 +2,37 @@ package indexing
 
 import (
 	"bufio"
-	"log"
+	"fmt"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/bugsnag/bugsnag-go/v2"
+	"github.com/pkg/errors"
+	log "unknwon.dev/clog/v2"
 )
 
 func (i *Index) parseFileHeaders(path string) (headers map[string]string) {
 	headers = make(map[string]string)
-	log.Printf("parsing file headers: %s", path)
+	log.Info("parsing file headers: %s", path)
 	file, err := os.Open(path)
 	if err != nil {
-		log.Fatal(err)
+		_ = bugsnag.Notify(errors.Wrap(err, "failed to parse file headers"))
+		return
 	}
 	defer file.Close()
 
+	startTime := time.Now()
+	defer i.metrics.ParseHeaders(startTime)
+
+	// scan the top of the file to look for a comment block containing the tags
 	scanner := bufio.NewScanner(file)
 	firstLine := true
 	for scanner.Scan() {
 		t := scanner.Text()
 		if firstLine {
 			if !strings.Contains(t, "<!--") {
-				log.Printf("missing headers from file: %s", path)
+				log.Warn("missing headers from file: %s", path)
 				return
 			}
 			firstLine = false
@@ -33,7 +43,13 @@ func (i *Index) parseFileHeaders(path string) (headers map[string]string) {
 		}
 		parts := strings.Split(t, ":")
 		if len(parts) != 2 {
-			log.Printf("invalid headers in file: %s (%s)", path, t)
+			log.Warn("invalid headers in file: %s (%s)", path, t)
+			_ = bugsnag.Notify(errors.New(fmt.Sprintf("invalid headers in file: %s (%s)", path, t)), bugsnag.MetaData{
+				"file": {
+					"path": path,
+				},
+			})
+
 			continue
 		}
 		headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
