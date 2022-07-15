@@ -9,16 +9,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Metrics defines the metrics used by the index
 type Metrics interface {
 	Indexed(startTime time.Time, topicCount, articleCount int)
 	ParseHeaders(startTime time.Time)
 	ReadFile(fileType string)
 }
 
+// Indexable defines the methods required by an indexable item
 type Indexable interface {
 	GetURI() string
 }
 
+// Index defines an index
 type Index struct {
 	contentPath string
 	topicFile   string
@@ -30,6 +33,7 @@ type Index struct {
 	metrics Metrics
 }
 
+// NewIndex creates a new index with the required dependencies
 func NewIndex(contentPath, topicFile string, metrics Metrics) *Index {
 	return &Index{
 		topicFile:   topicFile,
@@ -38,6 +42,7 @@ func NewIndex(contentPath, topicFile string, metrics Metrics) *Index {
 	}
 }
 
+// Index will reindex the content directory
 func (i *Index) Index() error {
 	startTime := time.Now()
 	// read the main content directory to look for topic directories
@@ -65,7 +70,7 @@ func (i *Index) Index() error {
 	}
 
 	i.topics = topics
-	i.indexPaths()
+	i.indexURIs()
 	i.indexFilePaths()
 
 	articleCount := 0
@@ -77,21 +82,24 @@ func (i *Index) Index() error {
 	return nil
 }
 
+// GetTopics returns all the indexed topics
 func (i *Index) GetTopics() []*Topic {
 	return i.topics
 }
 
-func (i *Index) GetArticleByURI(path string) (*Article, error) {
+// GetArticleByURI returns the article
+func (i *Index) GetArticleByURI(uri string) (*Article, error) {
 	if i.articlesByURI == nil {
-		i.indexPaths()
+		i.indexURIs()
 	}
-	path = strings.TrimLeft(path, "/")
-	if article, ok := i.articlesByURI[path]; ok {
+	uri = strings.TrimLeft(uri, "/")
+	if article, ok := i.articlesByURI[uri]; ok {
 		return article, nil
 	}
 	return nil, errors.New("no such article")
 }
 
+// GetURIForFile returns the URI used by the file at the given path
 func (i *Index) GetURIForFile(filepath string) string {
 	if entry, ok := i.entryByFilePath[filepath]; ok {
 		return entry.GetURI()
@@ -99,7 +107,8 @@ func (i *Index) GetURIForFile(filepath string) string {
 	return ""
 }
 
-func (i *Index) indexPaths() {
+// indexURIs stores entries by their URI
+func (i *Index) indexURIs() {
 	i.articlesByURI = make(map[string]*Article)
 	for _, topic := range i.topics {
 		for _, article := range topic.Articles {
@@ -108,6 +117,7 @@ func (i *Index) indexPaths() {
 	}
 }
 
+// indexFilePaths stores entries by their filepath on disk
 func (i *Index) indexFilePaths() {
 	i.entryByFilePath = make(map[string]Indexable)
 	for _, topic := range i.topics {

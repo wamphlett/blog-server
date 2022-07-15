@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// Topic defines a topic entry
 type Topic struct {
 	Slug     string
 	URI      string
@@ -14,6 +15,7 @@ type Topic struct {
 	Articles []*Article
 }
 
+// loadTopicFromFile creates a new topic from file at the given path
 func (i *Index) loadTopicFromFile(topicFilePath string) *Topic {
 	headers := i.parseFileHeaders(topicFilePath)
 	if published, ok := headers["published"]; !ok || published != "true" {
@@ -62,6 +64,7 @@ func (i *Index) loadTopicFromFile(topicFilePath string) *Topic {
 	return topic
 }
 
+// GetTopic returns the topic with the given slug
 func (i *Index) GetTopic(slug string) *Topic {
 	for _, topic := range i.topics {
 		if topic.Slug == slug {
@@ -71,6 +74,7 @@ func (i *Index) GetTopic(slug string) *Topic {
 	return nil
 }
 
+// GetArticle returns the article with the given slug
 func (t *Topic) GetArticle(slug string) *Article {
 	for _, article := range t.Articles {
 		if article.Slug == slug {
@@ -80,6 +84,7 @@ func (t *Topic) GetArticle(slug string) *Article {
 	return nil
 }
 
+// GetURI returns the URI used by the website
 func (t *Topic) GetURI() string {
 	return t.URI
 }

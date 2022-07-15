@@ -4,9 +4,12 @@ import (
 	"context"
 	"log"
 
+	"github.com/bugsnag/bugsnag-go/v2"
+	"github.com/pkg/errors"
 	"github.com/sethvargo/go-envconfig"
 )
 
+// Config defines the config values required to run the app
 type Config struct {
 	Environment          string   `env:"ENVIRONMENT,default=development"`
 	ServerPort           int      `env:"PORT,default=3000"`
@@ -29,6 +32,7 @@ type Config struct {
 	BugsnagApiKey string `env:"BUGSNAG_API_KEY"`
 }
 
+// InfluxConfig defines the config to load InfluxDB
 type InfluxConfig struct {
 	Host   string `env:"INFLUX_HOST"`
 	Bucket string `env:"INFLUX_BUCKET"`
@@ -36,11 +40,14 @@ type InfluxConfig struct {
 	Org    string `env:"INFLUX_ORG"`
 }
 
+// NewFromEnv reads the environment variables and creates a new config
 func NewFromEnv() *Config {
 	ctx := context.Background()
 
 	c := &Config{}
 	if err := envconfig.Process(ctx, c); err != nil {
+		err = errors.Wrap(err, "failed to load config from env")
+		bugsnag.Notify(err)
 		log.Fatal(err)
 	}
 

@@ -16,20 +16,23 @@ import (
 	log "unknwon.dev/clog/v2"
 )
 
+// Metrics defines the metrics used by the server
 type Metrics interface {
 	Request(uri string, startTime time.Time)
 }
 
+// FileReader defines the methods required by the reader
 type FileReader interface {
-	ReadFile(filepath string) (string, error)
+	ReadFileAsHTML(filepath string) (string, error)
 }
 
+// Index defines the methods required by the index
 type Index interface {
 	GetTopics() []*indexing.Topic
 	GetTopic(path string) *indexing.Topic
-	GetArticle(topicPath, articlePath string) *indexing.Article
 }
 
+// Server defines a new server
 type Server struct {
 	reader           FileReader
 	index            Index
@@ -41,20 +44,24 @@ type Server struct {
 	allowedOrigins   []string
 }
 
+// Option defines the function required to set options
 type Option func(*Server)
 
+// WithPort specifies the port to bind
 func WithPort(port int) Option {
 	return func(s *Server) {
 		s.port = port
 	}
 }
 
+// WithAllowedOrigins specifies the allowed origins to specify in the cors config
 func WithAllowedOrigins(origins []string) Option {
 	return func(s *Server) {
 		s.allowedOrigins = origins
 	}
 }
 
+// New creates a new server with the required dependencies
 func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath string, metrics Metrics, opts ...Option) *Server {
 	s := &Server{
 		reader:           reader,
@@ -100,7 +107,7 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 
 func (s *Server) getOverview(w http.ResponseWriter, r *http.Request) {
 	// read the file
-	content, err := s.reader.ReadFile(s.overviewFilePath)
+	content, err := s.reader.ReadFileAsHTML(s.overviewFilePath)
 	if err != nil {
 		s.internalError(w, r)
 		return
@@ -155,7 +162,7 @@ func (s *Server) getArticle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// read the file
-	content, err := s.reader.ReadFile(article.FilePath)
+	content, err := s.reader.ReadFileAsHTML(article.FilePath)
 	if err != nil {
 		s.internalError(w, r)
 		return
@@ -177,7 +184,7 @@ func (s *Server) getTopic(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// read the file
-	content, err := s.reader.ReadFile(topic.FilePath)
+	content, err := s.reader.ReadFileAsHTML(topic.FilePath)
 	if err != nil {
 		s.internalError(w, r)
 		return

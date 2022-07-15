@@ -9,21 +9,36 @@ import (
 	log "unknwon.dev/clog/v2"
 )
 
+// Metrics defines the metrics used by the updater
 type Metrics interface {
 	ContentUpdated(startTime time.Time)
 }
 
+// Updater defines a new updater
 type Updater struct {
-	path    string
-	repo    string
-	metrics Metrics
+	path      string
+	repo      string
+	metrics   Metrics
+	callbacks []func()
 }
 
-func New(repoUrl, contentPath string, refreshInterval time.Duration, metrics Metrics, onRefresh func()) (*Updater, error) {
+// Option defines the function used to set options
+type Option func(*Updater)
+
+// WithCallback defines a callback to use after each update
+func WithCallback(function func()) Option {
+	return func(u *Updater) {
+		u.callbacks = append(u.callbacks, function)
+	}
+}
+
+// New creates a new updater with the required dependencies
+func New(repoUrl, contentPath string, refreshInterval time.Duration, metrics Metrics, opts ...Option) (*Updater, error) {
 	u := &Updater{
-		path:    contentPath,
-		repo:    repoUrl,
-		metrics: metrics,
+		path:      contentPath,
+		repo:      repoUrl,
+		metrics:   metrics,
+		callbacks: []func(){},
 	}
 	// update immediately
 	if err := u.Update(true); err != nil {
@@ -34,7 +49,9 @@ func New(repoUrl, contentPath string, refreshInterval time.Duration, metrics Met
 		if err := u.Update(false); err != nil {
 			log.Error("error when updating content", err)
 		}
-		onRefresh()
+		for _, callback := range u.callbacks {
+			callback()
+		}
 	})
 
 	log.Info("updater configured to refresh content every %.0f seconds", refreshInterval.Seconds())
@@ -42,6 +59,7 @@ func New(repoUrl, contentPath string, refreshInterval time.Duration, metrics Met
 	return u, nil
 }
 
+// Update updates the content from the remote repository
 func (u *Updater) Update(forceFresh bool) error {
 	startTime := time.Now()
 	defer u.metrics.ContentUpdated(startTime)
@@ -63,6 +81,7 @@ func (u *Updater) Update(forceFresh bool) error {
 	return u.pull()
 }
 
+// clone does a git clone from the remote repository
 func (u *Updater) clone() error {
 	log.Info("cloning %s", u.repo)
 	// clone the repo
@@ -75,6 +94,7 @@ func (u *Updater) clone() error {
 	return nil
 }
 
+// pull does a git pull from the remote repository
 func (u *Updater) pull() error {
 	log.Info("pulling changes from %s", u.repo)
 	// Get the changes from the remote repo
@@ -91,6 +111,7 @@ func (u *Updater) pull() error {
 	return nil
 }
 
+// scheduleUpdates start a new ticker to update the content on the given interval
 func scheduleUpdates(interval time.Duration, f func()) {
 	for range time.Tick(interval) {
 		f()

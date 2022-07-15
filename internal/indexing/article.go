@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// Article defines the information held about an article
 type Article struct {
 	Slug     string
 	URI      string
@@ -12,10 +13,12 @@ type Article struct {
 	Title    string
 }
 
+// GetURI returns the URL used by the website
 func (a *Article) GetURI() string {
 	return a.URI
 }
 
+// loadArticleFromPath reads the given file path and creates a new article
 func (i *Index) loadArticleFromPath(articleFilePath, topicSlug string) *Article {
 	headers := i.parseFileHeaders(articleFilePath)
 	if published, ok := headers["published"]; !ok || published != "true" {
@@ -37,17 +40,4 @@ func (i *Index) loadArticleFromPath(articleFilePath, topicSlug string) *Article 
 		Slug:     strings.Trim(slug, "/"),
 		FilePath: articleFilePath,
 	}
-}
-
-func (i *Index) GetArticle(topicSlug, articleSlug string) *Article {
-	topic := i.GetTopic(topicSlug)
-	if topic == nil {
-		return nil
-	}
-	for _, article := range topic.Articles {
-		if article.Slug == articleSlug {
-			return article
-		}
-	}
-	return nil
 }

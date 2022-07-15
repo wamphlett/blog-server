@@ -14,14 +14,17 @@ import (
 	"github.com/wamphlett/blog-server/config"
 )
 
+// Client defines a new metrics client
 type Client struct {
 	influx      influxdb2.Client
 	writer      api.WriteAPIBlocking
 	defaultTags map[string]string
 }
 
+// Options defines the function required for settings options
 type Option func(*Client)
 
+// New creates a new metrics client with the given options
 func New(cfg *config.InfluxConfig, options ...Option) *Client {
 	clog.Info("Initialising new influxdb client")
 	client := influxdb2.NewClient(cfg.Host, cfg.Token)
@@ -31,6 +34,7 @@ func New(cfg *config.InfluxConfig, options ...Option) *Client {
 		defaultTags: map[string]string{},
 	}
 
+	// apply options
 	for _, option := range options {
 		option(c)
 	}
@@ -38,6 +42,7 @@ func New(cfg *config.InfluxConfig, options ...Option) *Client {
 	return c
 }
 
+// WithDefaultTags specifies a list of tags to use on every metric
 func WithDefaultTags(tags map[string]string) Option {
 	return func(c *Client) {
 		for tag, value := range tags {

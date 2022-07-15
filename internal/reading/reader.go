@@ -15,14 +15,17 @@ import (
 	"github.com/yuin/goldmark/renderer/html"
 )
 
+// Metrics defines the metrics used by the reader
 type Metrics interface {
 	ParseFile(startTime time.Time)
 }
 
+// Index defines the methods required by the index
 type Index interface {
 	GetURIForFile(filepath string) string
 }
 
+// Reader defines a reader
 type Reader struct {
 	staticContentURL string
 	staticContentDir string
@@ -30,6 +33,7 @@ type Reader struct {
 	index            Index
 }
 
+// New creates a new reader with the required dependencies
 func New(index Index, staticContentURL, staticContentDir string, metrics Metrics) *Reader {
 	return &Reader{
 		staticContentURL: staticContentURL,
@@ -39,10 +43,7 @@ func New(index Index, staticContentURL, staticContentDir string, metrics Metrics
 	}
 }
 
-func (r *Reader) ReadFile(filepath string) (string, error) {
-	return r.ReadFileAsHTML(filepath)
-}
-
+// ReadFileAsHTML reads the markdown file at the given location and returns the HTML version
 func (r *Reader) ReadFileAsHTML(filepath string) (string, error) {
 	startTime := time.Now()
 	defer r.metrics.ParseFile(startTime)
@@ -68,6 +69,7 @@ func (r *Reader) ReadFileAsHTML(filepath string) (string, error) {
 	return buf.String(), nil
 }
 
+// replaceRelativeLinks replaces all relative links in the content with the absolute URI
 func (r *Reader) replaceRelativeLinks(s, path string) string {
 	reg := regexp.MustCompile(`(\[[\w\d\s\-!?]*\]\()(\.[\/\.\w\d\-]*)\)`)
 	for _, match := range reg.FindAllStringSubmatch(s, -1) {
@@ -79,6 +81,7 @@ func (r *Reader) replaceRelativeLinks(s, path string) string {
 	return s
 }
 
+// replaceImageLinks replaces all the links to static files with the URL where the files are hosted
 func (r *Reader) replaceImageLinks(s string) string {
 	regex := regexp.MustCompile(fmt.Sprintf(`[\.\/]*%s\/`, r.staticContentDir))
 	for _, match := range regex.FindAllString(s, -1) {
