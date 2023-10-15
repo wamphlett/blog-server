@@ -3,16 +3,21 @@ package indexing
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
 // Topic defines a topic entry
 type Topic struct {
-	Slug     string
-	URI      string
-	FilePath string
-	Title    string
-	Articles []*Article
+	Slug        string
+	URI         string
+	FilePath    string
+	Title       string
+	Description string
+	Image       string
+	Metadata    map[string]string
+	Priority    int64
+	Articles    []*Article
 }
 
 // loadTopicFromFile creates a new topic from file at the given path
@@ -22,24 +27,40 @@ func (i *Index) loadTopicFromFile(topicFilePath string) *Topic {
 		return nil
 	}
 
-	topicDirName := filepath.Base(filepath.Dir(topicFilePath))
-	slug, ok := headers["slug"]
-	if !ok {
-		slug = strings.ToLower(topicDirName)
-	}
-
-	title, ok := headers["title"]
-	if !ok {
-		title = topicDirName
-	}
-
 	topic := &Topic{
-		Title:    title,
-		URI:      filepath.Join("/", slug),
-		Slug:     strings.Trim(slug, "/"),
 		FilePath: topicFilePath,
+		Metadata: map[string]string{},
 		Articles: []*Article{},
 	}
+
+	for header, value := range headers {
+		switch header {
+		case "slug":
+			topic.Slug = strings.ToLower(value)
+		case "title":
+			topic.Title = value
+		case "description":
+			topic.Description = value
+		case "image":
+			topic.Image = value
+		case "priority":
+			topic.Priority, _ = strconv.ParseInt(value, 10, 64)
+		default:
+			topic.Metadata[header] = value
+		}
+	}
+
+	topicDirName := filepath.Base(filepath.Dir(topicFilePath))
+
+	if topic.Slug == "" {
+		topic.Slug = strings.ToLower(topicDirName)
+	}
+
+	if topic.Title == "" {
+		topic.Title = topicDirName
+	}
+
+	topic.URI = filepath.Join("/", topic.Slug)
 
 	files, err := os.ReadDir(filepath.Dir(topicFilePath))
 	if err != nil {

@@ -245,10 +245,13 @@ func buildArticleUrl(topic *indexing.Topic, article *indexing.Article) string {
 func convertTopic(topic *indexing.Topic) Topic {
 	return Topic{
 		CommonItemResponse{
-			Title:    topic.Title,
-			URL:      buildTopicUrl(topic),
-			Priority: 0,
-			Slug:     topic.Slug,
+			Title:       topic.Title,
+			Description: topic.Description,
+			Image:       topic.Image,
+			URL:         buildTopicUrl(topic),
+			Priority:    topic.Priority,
+			Slug:        topic.Slug,
+			Metadata:    topic.Metadata,
 		},
 		buildTopicArticlesUrl(topic),
 	}
@@ -257,10 +260,13 @@ func convertTopic(topic *indexing.Topic) Topic {
 func convertArticle(topic *indexing.Topic, article *indexing.Article) Article {
 	return Article{
 		CommonItemResponse{
-			Title:    article.Title,
-			URL:      buildArticleUrl(topic, article),
-			Priority: 0,
-			Slug:     article.Slug,
+			Title:       article.Title,
+			Description: article.Description,
+			Image:       article.Image,
+			URL:         buildArticleUrl(topic, article),
+			Priority:    article.Priority,
+			Slug:        article.Slug,
+			Metadata:    article.Metadata,
 		},
 	}
 }

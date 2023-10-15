@@ -1,10 +1,13 @@
 package serving
 
 type CommonItemResponse struct {
-	Title    string `json:"title"`
-	URL      string `json:"url"`
-	Priority int    `json:"priority"`
-	Slug     string `json:"slug"`
+	Title       string            `json:"title"`
+	Description string            `json:"description"`
+	Image       string            `json:"image"`
+	URL         string            `json:"url"`
+	Priority    int64             `json:"priority"`
+	Slug        string            `json:"slug"`
+	Metadata    map[string]string `json:"metadata"`
 }
 
 type HtmlResponse struct {

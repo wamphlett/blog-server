@@ -86,8 +86,6 @@ func (u *Updater) clone() error {
 	log.Info("cloning %s", u.repo)
 	// clone the repo
 	cmd := exec.Command("git", "clone", u.repo, u.path)
-	// cmd.Stdout = s.l.Info
-	// cmd.Stderr = s.l.Info
 	if err := cmd.Run(); err != nil {
 		return err
 	}

@@ -2,15 +2,20 @@ package indexing
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
 // Article defines the information held about an article
 type Article struct {
-	Slug     string
-	URI      string
-	FilePath string
-	Title    string
+	Slug        string
+	URI         string
+	FilePath    string
+	Title       string
+	Description string
+	Image       string
+	Priority    int64
+	Metadata    map[string]string
 }
 
 // GetURI returns the URL used by the website
@@ -25,19 +30,38 @@ func (i *Index) loadArticleFromPath(articleFilePath, topicSlug string) *Article 
 		return nil
 	}
 
-	fileName := strings.TrimRight(filepath.Base(articleFilePath), ".md")
-	slug, ok := headers["slug"]
-	if !ok {
-		slug = strings.ToLower(fileName)
-	}
-	title, ok := headers["title"]
-	if !ok {
-		title = fileName
-	}
-	return &Article{
-		Title:    title,
-		URI:      filepath.Join("/", topicSlug, slug),
-		Slug:     strings.Trim(slug, "/"),
+	article := &Article{
 		FilePath: articleFilePath,
+		Metadata: map[string]string{},
 	}
+
+	for header, value := range headers {
+		switch header {
+		case "slug":
+			article.Slug = strings.ToLower(value)
+		case "title":
+			article.Title = value
+		case "description":
+			article.Description = value
+		case "image":
+			article.Image = value
+		case "priority":
+			article.Priority, _ = strconv.ParseInt(value, 10, 64)
+		default:
+			article.Metadata[header] = value
+		}
+	}
+
+	filename := strings.TrimRight(filepath.Base(articleFilePath), ".md")
+	if article.Slug == "" {
+		article.Slug = strings.ToLower(filename)
+	}
+
+	if article.Title == "" {
+		article.Title = filename
+	}
+
+	article.URI = filepath.Join("/", topicSlug, article.Slug)
+
+	return article
 }

@@ -41,8 +41,11 @@ func (i *Index) parseFileHeaders(path string) (headers map[string]string) {
 		if strings.Contains(t, "-->") {
 			return
 		}
-		parts := strings.Split(t, ":")
-		if len(parts) != 2 {
+
+		// Find the first occurrence of ":"
+		colonIndex := strings.Index(t, ":")
+
+		if colonIndex == -1 {
 			log.Warn("invalid headers in file: %s (%s)", path, t)
 			_ = bugsnag.Notify(errors.New(fmt.Sprintf("invalid headers in file: %s (%s)", path, t)), bugsnag.MetaData{
 				"file": {
@@ -52,7 +55,12 @@ func (i *Index) parseFileHeaders(path string) (headers map[string]string) {
 
 			continue
 		}
-		headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+
+		// Split the line into key and value based on the first ":"
+		key := strings.TrimSpace(t[:colonIndex])
+		value := strings.TrimSpace(t[colonIndex+1:])
+
+		headers[strings.TrimSpace(key)] = strings.TrimSpace(value)
 	}
 	return
 }
