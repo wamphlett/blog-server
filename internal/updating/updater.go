@@ -40,6 +40,12 @@ func New(repoUrl, contentPath string, refreshInterval time.Duration, metrics Met
 		metrics:   metrics,
 		callbacks: []func(){},
 	}
+
+	// apply the options
+	for _, opt := range opts {
+		opt(u)
+	}
+
 	// update immediately
 	if err := u.Update(true); err != nil {
 		return nil, err

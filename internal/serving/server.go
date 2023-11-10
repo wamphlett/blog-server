@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/bugsnag/bugsnag-go/v2"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rs/cors"
@@ -30,6 +32,7 @@ type FileReader interface {
 type Index interface {
 	GetTopics() []*indexing.Topic
 	GetTopic(path string) *indexing.Topic
+	GetRecent(limit int) []*indexing.Article
 }
 
 // Server defines a new server
@@ -83,6 +86,7 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 
 	// set up server routes
 	s.router.HandleFunc("/overview", s.getOverview)
+	s.router.HandleFunc("/recent", s.getRecent)
 	s.router.HandleFunc("/topics", s.listTopics)
 	s.router.HandleFunc("/topics/{topic}", s.getTopic)
 	s.router.HandleFunc("/topics/{topic}/articles", s.listArticles)
@@ -116,6 +120,30 @@ func (s *Server) getOverview(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(OverviewResponse{
 		HtmlResponse{content},
+	})
+}
+
+func (s *Server) getRecent(w http.ResponseWriter, r *http.Request) {
+	limit := 3
+	if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
+		limit, _ = strconv.Atoi(limitParam)
+	}
+
+	recentArticles := s.index.GetRecent(limit)
+	convertedArticles := make([]Article, len(recentArticles))
+	for i, article := range recentArticles {
+		articleTopic := s.index.GetTopic(article.TopicSlug)
+		if articleTopic == nil {
+			bugsnag.Notify(errors.Errorf("failed to find topic for article %s", article.Slug))
+			continue
+		}
+
+		convertedArticles[i] = convertArticle(articleTopic, article)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(ListArticlesResponse{
+		convertedArticles,
 	})
 }
 
@@ -243,17 +271,28 @@ func buildArticleUrl(topic *indexing.Topic, article *indexing.Article) string {
 }
 
 func convertTopic(topic *indexing.Topic) Topic {
+	publishedArticleCount := 0
+	for _, article := range topic.Articles {
+		if !article.Hidden && article.PublishedAt > 0 {
+			publishedArticleCount++
+		}
+	}
+
 	return Topic{
 		CommonItemResponse{
 			Title:       topic.Title,
 			Description: topic.Description,
+			Hidden:      topic.Hidden,
 			Image:       topic.Image,
 			URL:         buildTopicUrl(topic),
 			Priority:    topic.Priority,
 			Slug:        topic.Slug,
+			PublishedAt: topic.PublishedAt,
+			UpdatedAt:   topic.UpdatedAt,
 			Metadata:    topic.Metadata,
 		},
 		buildTopicArticlesUrl(topic),
+		publishedArticleCount,
 	}
 }
 
@@ -262,12 +301,16 @@ func convertArticle(topic *indexing.Topic, article *indexing.Article) Article {
 		CommonItemResponse{
 			Title:       article.Title,
 			Description: article.Description,
+			Hidden:      article.Hidden,
 			Image:       article.Image,
 			URL:         buildArticleUrl(topic, article),
 			Priority:    article.Priority,
 			Slug:        article.Slug,
+			PublishedAt: article.PublishedAt,
+			UpdatedAt:   article.UpdatedAt,
 			Metadata:    article.Metadata,
 		},
+		topic.Slug,
 	}
 }
 

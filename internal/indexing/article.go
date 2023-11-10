@@ -8,13 +8,17 @@ import (
 
 // Article defines the information held about an article
 type Article struct {
+	Hidden      bool
 	Slug        string
+	TopicSlug   string
 	URI         string
 	FilePath    string
 	Title       string
 	Description string
 	Image       string
 	Priority    int64
+	PublishedAt int64
+	UpdatedAt   int64
 	Metadata    map[string]string
 }
 
@@ -26,17 +30,21 @@ func (a *Article) GetURI() string {
 // loadArticleFromPath reads the given file path and creates a new article
 func (i *Index) loadArticleFromPath(articleFilePath, topicSlug string) *Article {
 	headers := i.parseFileHeaders(articleFilePath)
-	if published, ok := headers["published"]; !ok || published != "true" {
-		return nil
-	}
 
 	article := &Article{
-		FilePath: articleFilePath,
-		Metadata: map[string]string{},
+		FilePath:  articleFilePath,
+		Metadata:  map[string]string{},
+		TopicSlug: topicSlug,
 	}
 
 	for header, value := range headers {
 		switch header {
+		case "published":
+			article.PublishedAt = convertToTimestamp(value)
+		case "updated":
+			article.UpdatedAt = convertToTimestamp(value)
+		case "hidden":
+			article.Hidden = value == "true"
 		case "slug":
 			article.Slug = strings.ToLower(value)
 		case "title":

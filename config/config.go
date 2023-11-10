@@ -23,7 +23,7 @@ type Config struct {
 	// The directory within the content path which holds static content
 	ContentAssetDir string `env:"CONTENT_ASSET_DIR,default=images"`
 	// The URL where static content will be served from
-	StaticAssetsURL string `env:"STATIC_ASSET_URL,required"`
+	StaticAssetsURL string `env:"STATIC_ASSET_URL,default=images"`
 
 	// The name which topic files use, everything else will be considered an article
 	TopicFile string `env:"TOPIC_FILE,default=README.md"`

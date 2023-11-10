@@ -3,6 +3,7 @@ package indexing
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ type Index struct {
 	topics          []*Topic
 	articlesByURI   map[string]*Article
 	entryByFilePath map[string]Indexable
+	articlesByDate  []*Article
 
 	metrics Metrics
 }
@@ -72,6 +74,7 @@ func (i *Index) Index() error {
 	i.topics = topics
 	i.indexURIs()
 	i.indexFilePaths()
+	i.indexByTime()
 
 	articleCount := 0
 	for _, topic := range topics {
@@ -107,6 +110,13 @@ func (i *Index) GetURIForFile(filepath string) string {
 	return ""
 }
 
+func (i *Index) GetRecent(limit int) []*Article {
+	if limit > len(i.articlesByDate) {
+		limit = len(i.articlesByDate)
+	}
+	return i.articlesByDate[:limit]
+}
+
 // indexURIs stores entries by their URI
 func (i *Index) indexURIs() {
 	i.articlesByURI = make(map[string]*Article)
@@ -126,4 +136,20 @@ func (i *Index) indexFilePaths() {
 			i.entryByFilePath[article.FilePath] = article
 		}
 	}
+}
+
+func (i *Index) indexByTime() {
+	i.articlesByDate = []*Article{}
+	for _, topic := range i.topics {
+		for _, article := range topic.Articles {
+			if article.PublishedAt == 0 || article.Hidden {
+				continue
+			}
+			i.articlesByDate = append(i.articlesByDate, article)
+		}
+	}
+
+	sort.Slice(i.articlesByDate, func(x, y int) bool {
+		return i.articlesByDate[y].PublishedAt < i.articlesByDate[x].PublishedAt
+	})
 }

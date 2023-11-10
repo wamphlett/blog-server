@@ -7,6 +7,9 @@ type CommonItemResponse struct {
 	URL         string            `json:"url"`
 	Priority    int64             `json:"priority"`
 	Slug        string            `json:"slug"`
+	PublishedAt int64             `json:"publishedAt"`
+	UpdatedAt   int64             `json:"updatedAt"`
+	Hidden      bool              `json:"hidden"`
 	Metadata    map[string]string `json:"metadata"`
 }
 
@@ -16,6 +19,7 @@ type HtmlResponse struct {
 
 type Article struct {
 	CommonItemResponse
+	TopicSlug string `json:"topicSlug"`
 }
 
 type GetArticleResponse struct {
@@ -25,7 +29,8 @@ type GetArticleResponse struct {
 
 type Topic struct {
 	CommonItemResponse
-	ArticleURL string `json:"articleUrl"`
+	ArticleURL            string `json:"articleUrl"`
+	PublishedArticleCount int    `json:"publishedArticleCount"`
 }
 
 type OverviewResponse struct {

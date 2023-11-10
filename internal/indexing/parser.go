@@ -64,3 +64,12 @@ func (i *Index) parseFileHeaders(path string) (headers map[string]string) {
 	}
 	return
 }
+
+func convertToTimestamp(dateStr string) int64 {
+	parsedDate, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		bugsnag.Notify(errors.Wrap(err, fmt.Sprintf("Failed to parse date: %s", dateStr)))
+		return 0
+	}
+	return parsedDate.Unix()
+}

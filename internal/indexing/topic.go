@@ -9,6 +9,7 @@ import (
 
 // Topic defines a topic entry
 type Topic struct {
+	Hidden      bool
 	Slug        string
 	URI         string
 	FilePath    string
@@ -17,15 +18,14 @@ type Topic struct {
 	Image       string
 	Metadata    map[string]string
 	Priority    int64
+	PublishedAt int64
+	UpdatedAt   int64
 	Articles    []*Article
 }
 
 // loadTopicFromFile creates a new topic from file at the given path
 func (i *Index) loadTopicFromFile(topicFilePath string) *Topic {
 	headers := i.parseFileHeaders(topicFilePath)
-	if published, ok := headers["published"]; !ok || published != "true" {
-		return nil
-	}
 
 	topic := &Topic{
 		FilePath: topicFilePath,
@@ -35,6 +35,12 @@ func (i *Index) loadTopicFromFile(topicFilePath string) *Topic {
 
 	for header, value := range headers {
 		switch header {
+		case "published":
+			topic.PublishedAt = convertToTimestamp(value)
+		case "updated":
+			topic.UpdatedAt = convertToTimestamp(value)
+		case "hidden":
+			topic.Hidden = value == "true"
 		case "slug":
 			topic.Slug = strings.ToLower(value)
 		case "title":
