@@ -25,6 +25,10 @@ type Config struct {
 	// The URL where static content will be served from
 	StaticAssetsURL string `env:"STATIC_ASSET_URL,default=images"`
 
+	// The host of the blog site
+	BlogSiteHost   string `env:"BLOG_SITE_HOST"`
+	BlogSiteSecret string `env:"BLOG_SITE_SECRET"`
+
 	// The name which topic files use, everything else will be considered an article
 	TopicFile string `env:"TOPIC_FILE,default=README.md"`
 

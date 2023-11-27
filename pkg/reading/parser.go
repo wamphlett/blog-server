@@ -1,4 +1,4 @@
-package indexing
+package reading
 
 import (
 	"bufio"
@@ -12,7 +12,7 @@ import (
 	log "unknwon.dev/clog/v2"
 )
 
-func (i *Index) parseFileHeaders(path string) (headers map[string]string) {
+func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 	headers = make(map[string]string)
 	log.Info("parsing file headers: %s", path)
 	file, err := os.Open(path)
@@ -23,7 +23,7 @@ func (i *Index) parseFileHeaders(path string) (headers map[string]string) {
 	defer file.Close()
 
 	startTime := time.Now()
-	defer i.metrics.ParseHeaders(startTime)
+	defer r.metrics.ParseHeaders(startTime)
 
 	// scan the top of the file to look for a comment block containing the tags
 	scanner := bufio.NewScanner(file)

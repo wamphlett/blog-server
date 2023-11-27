@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,11 +13,14 @@ import (
 	log "unknwon.dev/clog/v2"
 
 	"github.com/wamphlett/blog-server/config"
-	"github.com/wamphlett/blog-server/internal/indexing"
-	"github.com/wamphlett/blog-server/internal/metrics"
-	"github.com/wamphlett/blog-server/internal/reading"
-	"github.com/wamphlett/blog-server/internal/serving"
-	"github.com/wamphlett/blog-server/internal/updating"
+	"github.com/wamphlett/blog-server/pkg/indexing"
+	database "github.com/wamphlett/blog-server/pkg/memoryDatabase"
+	memorydatabase "github.com/wamphlett/blog-server/pkg/memoryDatabase"
+	"github.com/wamphlett/blog-server/pkg/metrics"
+	"github.com/wamphlett/blog-server/pkg/model"
+	"github.com/wamphlett/blog-server/pkg/reading"
+	"github.com/wamphlett/blog-server/pkg/serving"
+	"github.com/wamphlett/blog-server/pkg/updating"
 )
 
 func init() {
@@ -37,25 +42,31 @@ func main() {
 		"environment": cfg.Environment,
 	}))
 
+	// create a new in memory database
+	database := memorydatabase.New()
+
 	// create a new indexer
-	indexer := indexing.NewIndex(cfg.ContentPath, cfg.TopicFile, metricsClient)
-
-	// start an updater if a repo was provided
-	if cfg.ContentRepo != "" {
-		if _, err := updating.New(cfg.ContentRepo, cfg.ContentPath, time.Duration(cfg.ContentUpdateIntervalSeconds)*time.Second, metricsClient,
-			updating.WithCallback(func() {
-				indexContent(indexer)
-			})); err != nil {
-			err = errors.Wrap(err, "failed to create updater")
-			bugsnag.Notify(err)
-			log.Fatal(err.Error())
-		}
-	}
-
-	indexContent(indexer)
+	indexer := indexing.NewIndex(database, metricsClient)
 
 	// create a new reader
 	reader := reading.New(indexer, cfg.StaticAssetsURL, cfg.ContentAssetDir, metricsClient)
+
+	// create a new updater
+	_, err := updating.New(
+		cfg.ContentPath,
+		cfg.TopicFile,
+		reader,
+		metricsClient,
+		updating.WithRemoteRepository(cfg.ContentRepo),
+		updating.WithRefreshInterval(time.Duration(cfg.ContentUpdateIntervalSeconds)*time.Second),
+		// the indexer directly receives the topics and articles every time the content is updated
+		updating.WithReceiver(updateReceiver(cfg.BlogSiteHost, cfg.BlogSiteSecret, database, indexer)),
+	)
+	if err != nil {
+		err = errors.Wrap(err, "failed to create updater")
+		bugsnag.Notify(err)
+		log.Fatal(err.Error())
+	}
 
 	// create and run a new server
 	server := serving.New(reader, indexer, cfg.ContentPath, cfg.ContentAssetDir, cfg.TopicFile, metricsClient,
@@ -67,10 +78,56 @@ func main() {
 	server.Shutdown()
 }
 
-func indexContent(index *indexing.Index) {
-	if err := index.Index(); err != nil {
-		err = errors.Wrap(err, "failed to index content")
-		log.Error(err.Error())
-		bugsnag.Notify(err)
+func updateReceiver(blogSitehost, secret string, db *database.Database, index *indexing.Index) func([]*model.Topic, []*model.Article) {
+	firstReceive := true
+	return func(updatedTopics []*model.Topic, updatedArticles []*model.Article) {
+		for _, topic := range updatedTopics {
+			db.StoreTopic(topic)
+		}
+
+		for _, article := range updatedArticles {
+			db.StoreArticle(article)
+		}
+
+		if len(updatedTopics) > 0 || len(updatedArticles) > 0 {
+			log.Info("reindexing after storing %d topics and %d articles", len(updatedTopics), len(updatedArticles))
+			index.Reindex()
+		}
+
+		if firstReceive {
+			log.Info("first receive, not clearing site cache")
+			firstReceive = false
+			return
+		}
+
+		if len(updatedTopics) == 0 && len(updatedArticles) == 0 {
+			return
+		}
+
+		if blogSitehost == "" || secret == "" {
+			log.Warn("not clearing site cache as blog site host or secret is not set")
+			return
+		}
+
+		for _, topic := range updatedTopics {
+			invalidateSiteCaches(blogSitehost, topic.URI, secret)
+		}
+
+		for _, article := range updatedArticles {
+			invalidateSiteCaches(blogSitehost, article.URI, secret)
+		}
 	}
+}
+
+func invalidateSiteCaches(host, path, secret string) error {
+	log.Info(fmt.Sprintf("invalidating site cache for %s", path))
+	url := fmt.Sprintf("%s/api/revalidate?path=%s&secret=%s", host, path, secret)
+
+	resp, err := http.Post(url, "application/json", nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
 }

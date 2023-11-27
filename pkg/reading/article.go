@@ -1,41 +1,22 @@
-package indexing
+package reading
 
 import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/wamphlett/blog-server/pkg/model"
 )
 
-// Article defines the information held about an article
-type Article struct {
-	Hidden      bool
-	Slug        string
-	TopicSlug   string
-	URI         string
-	FilePath    string
-	Title       string
-	Description string
-	Image       string
-	Priority    int64
-	PublishedAt int64
-	UpdatedAt   int64
-	Metadata    map[string]string
-}
-
-// GetURI returns the URL used by the website
-func (a *Article) GetURI() string {
-	return a.URI
-}
-
 // loadArticleFromPath reads the given file path and creates a new article
-func (i *Index) loadArticleFromPath(articleFilePath, topicSlug string) *Article {
-	headers := i.parseFileHeaders(articleFilePath)
-
-	article := &Article{
+func (r *Reader) LoadArticleFromFile(articleFilePath, topicSlug string) *model.Article {
+	article := &model.Article{
 		FilePath:  articleFilePath,
-		Metadata:  map[string]string{},
 		TopicSlug: topicSlug,
+		Metadata:  map[string]string{},
 	}
+
+	headers := r.parseFileHeaders(articleFilePath)
 
 	for header, value := range headers {
 		switch header {

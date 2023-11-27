@@ -14,7 +14,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rs/cors"
-	"github.com/wamphlett/blog-server/internal/indexing"
+	"github.com/wamphlett/blog-server/pkg/model"
 	log "unknwon.dev/clog/v2"
 )
 
@@ -30,9 +30,11 @@ type FileReader interface {
 
 // Index defines the methods required by the index
 type Index interface {
-	GetTopics() []*indexing.Topic
-	GetTopic(path string) *indexing.Topic
-	GetRecent(limit int) []*indexing.Article
+	GetAllTopics() []*model.Topic
+	GetTopicByIdentifier(topicIdentidier string) *model.Topic
+	GetArticleByIdentifier(topicIdentidier, identifier string) *model.Article
+	GetAllArticlesForTopic(topicIdentifier string) []*model.Article
+	GetRecentArticles(limit int) []*model.Article
 }
 
 // Server defines a new server
@@ -129,10 +131,10 @@ func (s *Server) getRecent(w http.ResponseWriter, r *http.Request) {
 		limit, _ = strconv.Atoi(limitParam)
 	}
 
-	recentArticles := s.index.GetRecent(limit)
+	recentArticles := s.index.GetRecentArticles(limit)
 	convertedArticles := make([]Article, len(recentArticles))
 	for i, article := range recentArticles {
-		articleTopic := s.index.GetTopic(article.TopicSlug)
+		articleTopic := s.index.GetTopicByIdentifier(article.TopicSlug)
 		if articleTopic == nil {
 			bugsnag.Notify(errors.Errorf("failed to find topic for article %s", article.Slug))
 			continue
@@ -148,10 +150,12 @@ func (s *Server) getRecent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) listTopics(w http.ResponseWriter, r *http.Request) {
-	topics := s.index.GetTopics()
+	topics := s.index.GetAllTopics()
 	topicResponses := make([]Topic, len(topics))
-	for i, topic := range topics {
-		topicResponses[i] = convertTopic(topic)
+	i := 0
+	for _, topic := range topics {
+		topicResponses[i] = convertTopic(topic, s.index.GetAllArticlesForTopic(topic.Slug))
+		i++
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -160,15 +164,18 @@ func (s *Server) listTopics(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) listArticles(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	topic := s.index.GetTopic(vars["topic"])
+	topic := s.index.GetTopicByIdentifier(vars["topic"])
 	if topic == nil {
 		s.notFound(w, r)
 		return
 	}
 
-	articles := make([]Article, len(topic.Articles))
-	for i, article := range topic.Articles {
+	topicArticles := s.index.GetAllArticlesForTopic(vars["topic"])
+	articles := make([]Article, len(topicArticles))
+	i := 0
+	for _, article := range topicArticles {
 		articles[i] = convertArticle(topic, article)
+		i++
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -177,13 +184,13 @@ func (s *Server) listArticles(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getArticle(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	topic := s.index.GetTopic(vars["topic"])
+	topic := s.index.GetTopicByIdentifier(vars["topic"])
 	if topic == nil {
 		s.notFound(w, r)
 		return
 	}
 
-	article := topic.GetArticle(vars["article"])
+	article := s.index.GetArticleByIdentifier(vars["topic"], vars["article"])
 	if article == nil {
 		s.notFound(w, r)
 		return
@@ -205,7 +212,7 @@ func (s *Server) getArticle(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) getTopic(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	topic := s.index.GetTopic(vars["topic"])
+	topic := s.index.GetTopicByIdentifier(vars["topic"])
 	if topic == nil {
 		s.notFound(w, r)
 		return
@@ -220,7 +227,7 @@ func (s *Server) getTopic(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(GetTopicResponse{
-		convertTopic(topic),
+		convertTopic(topic, s.index.GetAllArticlesForTopic(vars["topic"])),
 		HtmlResponse{content},
 	})
 }
@@ -258,21 +265,21 @@ func (s *Server) Shutdown() {
 	s.srv.Shutdown(ctx)
 }
 
-func buildTopicUrl(topic *indexing.Topic) string {
+func buildTopicUrl(topic *model.Topic) string {
 	return fmt.Sprintf("/topics/%s", topic.Slug)
 }
 
-func buildTopicArticlesUrl(topic *indexing.Topic) string {
+func buildTopicArticlesUrl(topic *model.Topic) string {
 	return fmt.Sprintf("%s/articles", buildTopicUrl(topic))
 }
 
-func buildArticleUrl(topic *indexing.Topic, article *indexing.Article) string {
+func buildArticleUrl(topic *model.Topic, article *model.Article) string {
 	return fmt.Sprintf("%s/%s", buildTopicArticlesUrl(topic), article.Slug)
 }
 
-func convertTopic(topic *indexing.Topic) Topic {
+func convertTopic(topic *model.Topic, articles []*model.Article) Topic {
 	publishedArticleCount := 0
-	for _, article := range topic.Articles {
+	for _, article := range articles {
 		if !article.Hidden && article.PublishedAt > 0 {
 			publishedArticleCount++
 		}
@@ -296,7 +303,7 @@ func convertTopic(topic *indexing.Topic) Topic {
 	}
 }
 
-func convertArticle(topic *indexing.Topic, article *indexing.Article) Article {
+func convertArticle(topic *model.Topic, article *model.Article) Article {
 	return Article{
 		CommonItemResponse{
 			Title:       article.Title,

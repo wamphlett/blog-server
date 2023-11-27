@@ -18,6 +18,7 @@ import (
 // Metrics defines the metrics used by the reader
 type Metrics interface {
 	ParseFile(startTime time.Time)
+	ParseHeaders(startTime time.Time)
 }
 
 // Index defines the methods required by the index
