@@ -30,6 +30,7 @@ type FileReader interface {
 
 // Index defines the methods required by the index
 type Index interface {
+	GetLastIndexedTime() time.Time
 	GetAllTopics() []*model.Topic
 	GetTopicByIdentifier(topicIdentidier string) *model.Topic
 	GetArticleByIdentifier(topicIdentidier, identifier string) *model.Article
@@ -87,6 +88,7 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 	s.router.PathPrefix(fmt.Sprintf("/%s/", assetDir)).Handler(neuter(http.FileServer(http.Dir(contentDir))))
 
 	// set up server routes
+	s.router.HandleFunc("/status", s.status)
 	s.router.HandleFunc("/overview", s.getOverview)
 	s.router.HandleFunc("/recent", s.getRecent)
 	s.router.HandleFunc("/topics", s.listTopics)
@@ -109,6 +111,14 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 	}
 
 	return s
+}
+
+func (s *Server) status(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(StatusResponse{
+		Ready:       true,
+		LastIndexed: s.index.GetLastIndexedTime().Unix(),
+	})
 }
 
 func (s *Server) getOverview(w http.ResponseWriter, r *http.Request) {

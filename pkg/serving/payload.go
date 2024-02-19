@@ -1,5 +1,10 @@
 package serving
 
+type StatusResponse struct {
+	Ready       bool  `json:"ready"`
+	LastIndexed int64 `json:"lastIndexed"`
+}
+
 type CommonItemResponse struct {
 	Title       string            `json:"title"`
 	Description string            `json:"description"`

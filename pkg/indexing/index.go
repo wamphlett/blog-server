@@ -48,6 +48,9 @@ type Index struct {
 	articlesByURI        map[string]*model.Article
 	urisByFilepath       map[string]string
 
+	// last indexed time
+	lastIndexed time.Time
+
 	database Database
 	metrics  Metrics
 }
@@ -65,6 +68,10 @@ func NewIndex(database Database, metrics Metrics, opts ...Option) *Index {
 	}
 
 	return i
+}
+
+func (i *Index) GetLastIndexedTime() time.Time {
+	return i.lastIndexed
 }
 
 func (i *Index) GetTopicByIdentifier(identifier string) *model.Topic {
@@ -129,6 +136,9 @@ func (i *Index) Reindex() {
 	i.indexArticlesByTime(articles)
 	i.indexArticlesByURI(articles)
 	i.indexByURIsByFilepath(topics, articles)
+
+	// Record the time
+	i.lastIndexed = startTime
 
 	i.metrics.Indexed(startTime, len(topics), len(articles))
 }
