@@ -28,9 +28,19 @@ func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 	// scan the top of the file to look for a comment block containing the tags
 	scanner := bufio.NewScanner(file)
 	firstLine := true
+	inMDPropertiesBlock := false
 	for scanner.Scan() {
 		t := scanner.Text()
 		if firstLine {
+			if strings.HasPrefix(t, "---") {
+				inMDPropertiesBlock = !inMDPropertiesBlock
+				continue
+			}
+
+			if inMDPropertiesBlock {
+				continue
+			}
+
 			if !strings.Contains(t, "<!--") {
 				log.Warn("missing headers from file: %s", path)
 				return
@@ -38,6 +48,7 @@ func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 			firstLine = false
 			continue
 		}
+
 		if strings.Contains(t, "-->") {
 			return
 		}
