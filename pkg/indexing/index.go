@@ -147,7 +147,7 @@ func (i *Index) indexArticlesByTime(articles []*model.Article) {
 	i.articlesByTime = []*model.Article{}
 
 	for _, article := range articles {
-		if article.PublishedAt == 0 || article.Hidden {
+		if !article.IsPublished() {
 			continue
 		}
 		i.articlesByTime = append(i.articlesByTime, article)

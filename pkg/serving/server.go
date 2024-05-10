@@ -290,7 +290,7 @@ func buildArticleUrl(topic *model.Topic, article *model.Article) string {
 func convertTopic(topic *model.Topic, articles []*model.Article) Topic {
 	publishedArticleCount := 0
 	for _, article := range articles {
-		if !article.Hidden && article.PublishedAt > 0 {
+		if article.IsPublished() {
 			publishedArticleCount++
 		}
 	}

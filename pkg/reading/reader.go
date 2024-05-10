@@ -54,7 +54,9 @@ func (r *Reader) ReadFileAsHTML(filepath string) (string, error) {
 		return "", errors.Wrap(err, "failed to read article file")
 	}
 
-	contents := r.replaceRelativeLinks(string(b), filepath)
+	contents := stripMarkdownProperties(string(b))
+
+	contents = r.replaceRelativeLinks(contents, filepath)
 	contents = r.replaceImageLinks(contents)
 
 	md := goldmark.New(
@@ -68,6 +70,11 @@ func (r *Reader) ReadFileAsHTML(filepath string) (string, error) {
 	}
 
 	return buf.String(), nil
+}
+
+func stripMarkdownProperties(s string) string {
+	regex := regexp.MustCompile(`(?s)^---.*?---`)
+	return regex.ReplaceAllString(s, "")
 }
 
 // replaceRelativeLinks replaces all relative links in the content with the absolute URI
