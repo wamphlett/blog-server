@@ -19,6 +19,7 @@ import (
 	"github.com/wamphlett/blog-server/pkg/metrics"
 	"github.com/wamphlett/blog-server/pkg/model"
 	"github.com/wamphlett/blog-server/pkg/reading"
+	"github.com/wamphlett/blog-server/pkg/scheduler"
 	"github.com/wamphlett/blog-server/pkg/serving"
 	"github.com/wamphlett/blog-server/pkg/updating"
 )
@@ -68,6 +69,9 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
+	// schedule a reindex every 24 hours
+	scheduler := scheduler.New(time.Date(0, 0, 0, 0, 1, 0, 0, time.Local), indexer.Reindex)
+
 	// create and run a new server
 	server := serving.New(reader, indexer, cfg.ContentPath, cfg.ContentAssetDir, cfg.TopicFile, metricsClient,
 		serving.WithPort(cfg.ServerPort), serving.WithAllowedOrigins(cfg.ServerAllowedOrigins))
@@ -76,6 +80,7 @@ func main() {
 	// wait for shutdown signals
 	<-signals
 	server.Shutdown()
+	scheduler.Shutdown()
 }
 
 func updateReceiver(blogSitehost, secret string, db *database.Database, index *indexing.Index) func([]*model.Topic, []*model.Article) {

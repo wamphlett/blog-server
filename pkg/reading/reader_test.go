@@ -1,7 +1,6 @@
 package reading_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
