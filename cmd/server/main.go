@@ -70,7 +70,10 @@ func main() {
 	}
 
 	// schedule a reindex every 24 hours
-	scheduler := scheduler.New(time.Date(0, 0, 0, 0, 1, 0, 0, time.Local), indexer.Reindex)
+	scheduler := scheduler.New(time.Date(0, 0, 0, 0, 1, 0, 0, time.Local), func() {
+		indexer.Reindex()
+		invalidateSiteCaches(cfg.BlogSiteHost, "/", cfg.BlogSiteSecret)
+	})
 
 	// create and run a new server
 	server := serving.New(reader, indexer, cfg.ContentPath, cfg.ContentAssetDir, cfg.TopicFile, metricsClient,
@@ -115,11 +118,15 @@ func updateReceiver(blogSitehost, secret string, db *database.Database, index *i
 		}
 
 		for _, topic := range updatedTopics {
-			invalidateSiteCaches(blogSitehost, topic.URI, secret)
+			if err := invalidateSiteCaches(blogSitehost, topic.URI, secret); err != nil {
+				log.Error("failed to invalidate site cache for topic %s: %v", topic.URI, err)
+			}
 		}
 
 		for _, article := range updatedArticles {
-			invalidateSiteCaches(blogSitehost, article.URI, secret)
+			if err := invalidateSiteCaches(blogSitehost, article.URI, secret); err != nil {
+				log.Error("failed to invalidate site cache for article %s: %v", article.URI, err)
+			}
 		}
 	}
 }
