@@ -75,6 +75,7 @@ func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 func convertToTimestamp(dateStr string) int64 {
 	parsedDate, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
+		slog.Error("failed to parse date", "date", dateStr, "error", err)
 		sentry.CaptureException(errors.Wrapf(err, "failed to parse date: %s", dateStr))
 		return 0
 	}

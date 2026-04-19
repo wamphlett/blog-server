@@ -124,9 +124,9 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getOverview(w http.ResponseWriter, r *http.Request) {
-	// read the file
 	content, err := s.reader.ReadFileAsHTML(s.overviewFilePath)
 	if err != nil {
+		slog.Error("failed to read overview file", "path", s.overviewFilePath, "error", err)
 		s.internalError(w, r)
 		return
 	}
@@ -148,6 +148,7 @@ func (s *Server) getRecent(w http.ResponseWriter, r *http.Request) {
 	for i, article := range recentArticles {
 		articleTopic := s.index.GetTopicByIdentifier(article.TopicSlug)
 		if articleTopic == nil {
+			slog.Error("failed to find topic for article", "article", article.Slug)
 			sentry.CaptureException(errors.Errorf("failed to find topic for article %s", article.Slug))
 			continue
 		}
@@ -208,9 +209,9 @@ func (s *Server) getArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// read the file
 	content, err := s.reader.ReadFileAsHTML(article.FilePath)
 	if err != nil {
+		slog.Error("failed to read article file", "topic", vars["topic"], "article", vars["article"], "error", err)
 		s.internalError(w, r)
 		return
 	}
@@ -230,9 +231,9 @@ func (s *Server) getTopic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// read the file
 	content, err := s.reader.ReadFileAsHTML(topic.FilePath)
 	if err != nil {
+		slog.Error("failed to read topic file", "topic", vars["topic"], "error", err)
 		s.internalError(w, r)
 		return
 	}
@@ -263,6 +264,7 @@ func (s *Server) recordingMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) ListenAndServe() {
+	slog.Info("server listening", "addr", s.srv.Addr)
 	if err := s.srv.ListenAndServe(); err != nil {
 		slog.Error("failed to serve", "error", err)
 		os.Exit(1)
@@ -270,12 +272,12 @@ func (s *Server) ListenAndServe() {
 }
 
 func (s *Server) Shutdown() {
-	// create a deadline to wait for.
+	slog.Info("server shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	// doesn't block if no connections, but will otherwise wait
-	// until the timeout deadline.
-	s.srv.Shutdown(ctx)
+	if err := s.srv.Shutdown(ctx); err != nil {
+		slog.Error("server shutdown error", "error", err)
+	}
 }
 
 func buildTopicUrl(topic *model.Topic) string {
@@ -347,9 +349,7 @@ func neuter(next http.Handler) http.Handler {
 
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Do stuff here
-		slog.Info("request", "uri", r.RequestURI)
-		// Call the next handler, which can be another middleware in the chain, or the final handler.
+		slog.Info("request", "method", r.Method, "uri", r.RequestURI)
 		next.ServeHTTP(w, r)
 	})
 }

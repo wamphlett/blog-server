@@ -55,12 +55,14 @@ func WithDefaultTags(tags map[string]string) Option {
 func (c *Client) publish(measurement string, fields map[string]interface{}, tags map[string]string) {
 	p := influxdb2.NewPoint(measurement, mergeTags(tags, c.defaultTags), fields, time.Now())
 	if err := c.writer.WritePoint(context.Background(), p); err != nil {
+		slog.Error("failed to publish metric", "measurement", measurement, "error", err)
 		sentry.CaptureException(errors.Wrap(err, "failed to publish metrics to influxdb"))
 	}
 }
 
 func (c *Client) publishBatch(points []*write.Point) {
 	if err := c.writer.WritePoint(context.Background(), points...); err != nil {
+		slog.Error("failed to publish batch metrics", "count", len(points), "error", err)
 		sentry.CaptureException(errors.Wrap(err, "failed to publish batch metrics to influxdb"))
 	}
 }

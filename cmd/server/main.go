@@ -84,7 +84,8 @@ func main() {
 	go server.ListenAndServe()
 
 	// wait for shutdown signals
-	<-signals
+	sig := <-signals
+	slog.Info("shutdown signal received", "signal", sig)
 	server.Shutdown()
 	scheduler.Shutdown()
 }

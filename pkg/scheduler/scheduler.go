@@ -24,6 +24,7 @@ func New(timeToExecute time.Time, f func()) *Scheduler {
 }
 
 func (s *Scheduler) Shutdown() {
+	slog.Info("scheduler shutting down")
 	s.cancelCurrentContext()
 }
 
@@ -64,7 +65,7 @@ func (s *Scheduler) runAtTime(ctx context.Context, t time.Time) {
 		case <-ctx.Done():
 			return
 		case <-time.After(time.Until(t)):
-			// run the function and reschedule
+			slog.Info("running scheduled task")
 			s.function()
 			s.reschedule()
 		}

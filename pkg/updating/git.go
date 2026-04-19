@@ -30,27 +30,28 @@ func (u *Updater) updateFromRemote(forceFresh bool) error {
 // clone does a git clone from the remote repository
 func (u *Updater) clone() error {
 	slog.Info("cloning repository", "repo", u.repo)
-	// clone the repo
 	cmd := exec.Command("git", "clone", u.repo, u.path)
-	if err := cmd.Run(); err != nil {
+	if out, err := cmd.CombinedOutput(); err != nil {
+		slog.Error("git clone failed", "repo", u.repo, "output", string(out), "error", err)
 		return err
 	}
+	slog.Info("repository cloned", "repo", u.repo)
 	return nil
 }
 
 // pull does a git pull from the remote repository
 func (u *Updater) pull() error {
 	slog.Info("pulling changes from repository", "repo", u.repo)
-	// Get the changes from the remote repo
 	cmd := exec.Command("git", "pull")
 	cmd.Env = []string{
 		fmt.Sprintf("GIT_DIR=%s/.git", u.path),
 		fmt.Sprintf("GIT_WORK_TREE=%s", u.path),
 	}
 
-	if err := cmd.Run(); err != nil {
+	if out, err := cmd.CombinedOutput(); err != nil {
+		slog.Error("git pull failed", "repo", u.repo, "output", string(out), "error", err)
 		return err
 	}
-
+	slog.Info("repository pulled", "repo", u.repo)
 	return nil
 }

@@ -118,11 +118,12 @@ func New(contentPath, topicFile string, reader Reader, metrics Metrics, opts ...
 // Update updates the content from the remote repository
 func (u *Updater) Update(forceFresh bool) error {
 	startTime := time.Now()
+	slog.Info("updating content", "force_fresh", forceFresh)
 	defer u.metrics.ContentUpdated(startTime)
 
 	if u.repo != "" {
-		err := u.updateFromRemote(forceFresh)
-		if err != nil {
+		if err := u.updateFromRemote(forceFresh); err != nil {
+			slog.Error("failed to update from remote", "error", err)
 			return err
 		}
 	}
@@ -131,6 +132,8 @@ func (u *Updater) Update(forceFresh bool) error {
 	if err != nil {
 		return err
 	}
+
+	slog.Info("content update complete", "changed_topics", len(topics), "changed_articles", len(articles), "duration", time.Since(startTime))
 
 	for _, receiver := range u.receivers {
 		receiver(topics, articles)
@@ -168,7 +171,7 @@ func (u *Updater) readFiles() ([]*model.Topic, []*model.Article, error) {
 		// check if the file has changed
 		checksum, err := u.calculateFileChecksum(topicFilePath)
 		if err != nil {
-			// if we fail here, we continue without a checksum
+			slog.Error("failed to calculate topic checksum", "path", topicFilePath, "error", err)
 			sentry.CaptureException(errors.Wrap(err, "failed to calculate topic checksum when updating"))
 		}
 
@@ -196,7 +199,7 @@ func (u *Updater) readFiles() ([]*model.Topic, []*model.Article, error) {
 			// check if the file has changed
 			checksum, err := u.calculateFileChecksum(articleFilepath)
 			if err != nil {
-				// if we fail here, we continue without a checksum
+				slog.Error("failed to calculate article checksum", "path", articleFilepath, "error", err)
 				sentry.CaptureException(errors.Wrap(err, "failed to calculate article checksum when updating"))
 			}
 

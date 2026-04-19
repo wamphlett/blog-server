@@ -1,6 +1,7 @@
 package indexing
 
 import (
+	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -126,21 +127,21 @@ func (i *Index) GetRecentArticles(limit int) []*model.Article {
 
 func (i *Index) Reindex() {
 	startTime := time.Now()
+	slog.Info("reindexing")
 
 	topics := i.database.GetAllTopics()
 	articles := i.database.GetAllArticles()
 
-	// Perform indexing
 	i.indexTopicsByIdentifier(topics)
 	i.indexArticlesByIdentifier(articles)
 	i.indexArticlesByTime(articles)
 	i.indexArticlesByURI(articles)
 	i.indexByURIsByFilepath(topics, articles)
 
-	// Record the time
 	i.lastIndexed = startTime
-
 	i.metrics.Indexed(startTime, len(topics), len(articles))
+
+	slog.Info("reindex complete", "topics", len(topics), "articles", len(articles), "duration", time.Since(startTime))
 }
 
 func (i *Index) indexArticlesByTime(articles []*model.Article) {

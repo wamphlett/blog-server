@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"github.com/yuin/goldmark"
@@ -51,6 +53,7 @@ func (r *Reader) ReadFileAsHTML(filepath string) (string, error) {
 
 	b, err := os.ReadFile(filepath)
 	if err != nil {
+		slog.Error("failed to read file", "path", filepath, "error", err)
 		return "", errors.Wrap(err, "failed to read article file")
 	}
 
@@ -66,6 +69,7 @@ func (r *Reader) ReadFileAsHTML(filepath string) (string, error) {
 	)
 	var buf bytes.Buffer
 	if err := md.Convert([]byte(contents), &buf); err != nil {
+		slog.Error("failed to parse markdown", "path", filepath, "error", err)
 		sentry.CaptureException(errors.Wrapf(err, "failed to parse file: %s", filepath))
 	}
 
