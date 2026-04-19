@@ -2,14 +2,13 @@ package reading
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"log/slog"
 
-	"github.com/bugsnag/bugsnag-go/v2"
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 )
 
@@ -18,7 +17,7 @@ func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 	slog.Info("parsing file headers", "path", path)
 	file, err := os.Open(path)
 	if err != nil {
-		_ = bugsnag.Notify(errors.Wrap(err, "failed to parse file headers"))
+		sentry.CaptureException(errors.Wrap(err, "failed to parse file headers"))
 		return
 	}
 	defer file.Close()
@@ -59,11 +58,7 @@ func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 
 		if colonIndex == -1 {
 			slog.Warn("invalid headers in file", "path", path, "line", t)
-			_ = bugsnag.Notify(errors.New(fmt.Sprintf("invalid headers in file: %s (%s)", path, t)), bugsnag.MetaData{
-				"file": {
-					"path": path,
-				},
-			})
+			sentry.CaptureException(errors.Errorf("invalid headers in file: %s (%s)", path, t))
 
 			continue
 		}
@@ -80,7 +75,7 @@ func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 func convertToTimestamp(dateStr string) int64 {
 	parsedDate, err := time.Parse("2006-01-02", dateStr)
 	if err != nil {
-		bugsnag.Notify(errors.Wrap(err, fmt.Sprintf("Failed to parse date: %s", dateStr)))
+		sentry.CaptureException(errors.Wrapf(err, "failed to parse date: %s", dateStr))
 		return 0
 	}
 	return parsedDate.Unix()

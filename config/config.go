@@ -2,9 +2,7 @@ package config
 
 import (
 	"context"
-	"os"
 
-	"github.com/bugsnag/bugsnag-go/v2"
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-envconfig"
 )
@@ -35,8 +33,8 @@ type Config struct {
 	// The name which topic files use, everything else will be considered an article
 	TopicFile string `env:"TOPIC_FILE,default=README.md"`
 
-	Influx        *InfluxConfig
-	BugsnagApiKey string `env:"BUGSNAG_API_KEY"`
+	Influx    *InfluxConfig
+	SentryDSN string `env:"SENTRY_DSN"`
 }
 
 // InfluxConfig defines the config to load InfluxDB
@@ -48,15 +46,14 @@ type InfluxConfig struct {
 }
 
 // NewFromEnv reads the environment variables and creates a new config
-func NewFromEnv() *Config {
+func NewFromEnv() (*Config, error) {
 	ctx := context.Background()
 
 	c := &Config{}
 	if err := envconfig.Process(ctx, c); err != nil {
 		err = errors.Wrap(err, "failed to load config from env")
-		bugsnag.Notify(err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	return c
+	return c, nil
 }

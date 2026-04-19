@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bugsnag/bugsnag-go/v2"
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 
 	"github.com/wamphlett/blog-server/config"
@@ -28,9 +28,17 @@ func main() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
 
-	cfg := config.NewFromEnv()
+	cfg, err := config.NewFromEnv()
 	setupLogger(cfg.LogLevel, cfg.LogFormat)
-	bugsnag.Configure(bugsnag.Configuration{APIKey: cfg.BugsnagApiKey})
+	if err := sentry.Init(sentry.ClientOptions{Dsn: cfg.SentryDSN}); err != nil {
+		slog.Error("failed to initialise sentry", "error", err)
+	}
+	if err != nil {
+		sentry.CaptureException(err)
+		slog.Error("failed to load config", "error", err)
+		sentry.Flush(2 * time.Second)
+		os.Exit(1)
+	}
 
 	// create a new metrics client
 	metricsClient := metrics.New(cfg.Influx, metrics.WithDefaultTags(map[string]string{
@@ -47,7 +55,7 @@ func main() {
 	reader := reading.New(indexer, cfg.StaticAssetsURL, cfg.ContentAssetDir, metricsClient)
 
 	// create a new updater
-	_, err := updating.New(
+	_, err = updating.New(
 		cfg.ContentPath,
 		cfg.TopicFile,
 		reader,
@@ -59,7 +67,7 @@ func main() {
 	)
 	if err != nil {
 		err = errors.Wrap(err, "failed to create updater")
-		bugsnag.Notify(err)
+		sentry.CaptureException(err)
 		slog.Error("failed to create updater", "error", err)
 		os.Exit(1)
 	}

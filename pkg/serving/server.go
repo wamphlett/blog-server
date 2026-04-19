@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bugsnag/bugsnag-go/v2"
+	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rs/cors"
@@ -148,7 +148,7 @@ func (s *Server) getRecent(w http.ResponseWriter, r *http.Request) {
 	for i, article := range recentArticles {
 		articleTopic := s.index.GetTopicByIdentifier(article.TopicSlug)
 		if articleTopic == nil {
-			bugsnag.Notify(errors.Errorf("failed to find topic for article %s", article.Slug))
+			sentry.CaptureException(errors.Errorf("failed to find topic for article %s", article.Slug))
 			continue
 		}
 

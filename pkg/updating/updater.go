@@ -10,7 +10,7 @@ import (
 
 	"log/slog"
 
-	"github.com/bugsnag/bugsnag-go/v2"
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"github.com/wamphlett/blog-server/pkg/model"
 )
@@ -169,7 +169,7 @@ func (u *Updater) readFiles() ([]*model.Topic, []*model.Article, error) {
 		checksum, err := u.calculateFileChecksum(topicFilePath)
 		if err != nil {
 			// if we fail here, we continue without a checksum
-			bugsnag.Notify(errors.Wrap(err, "failed to calculate topic checksum when updating"))
+			sentry.CaptureException(errors.Wrap(err, "failed to calculate topic checksum when updating"))
 		}
 
 		previousChecksum, ok := u.fileChecksums[topicFilePath]
@@ -197,7 +197,7 @@ func (u *Updater) readFiles() ([]*model.Topic, []*model.Article, error) {
 			checksum, err := u.calculateFileChecksum(articleFilepath)
 			if err != nil {
 				// if we fail here, we continue without a checksum
-				bugsnag.Notify(errors.Wrap(err, "failed to calculate article checksum when updating"))
+				sentry.CaptureException(errors.Wrap(err, "failed to calculate article checksum when updating"))
 			}
 
 			previousChecksum, ok := u.fileChecksums[articleFilepath]

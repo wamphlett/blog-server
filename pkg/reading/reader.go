@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bugsnag/bugsnag-go/v2"
+	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/renderer/html"
@@ -66,7 +66,7 @@ func (r *Reader) ReadFileAsHTML(filepath string) (string, error) {
 	)
 	var buf bytes.Buffer
 	if err := md.Convert([]byte(contents), &buf); err != nil {
-		_ = bugsnag.Notify(errors.Wrapf(err, "failed to parse file: %s", filepath))
+		sentry.CaptureException(errors.Wrapf(err, "failed to parse file: %s", filepath))
 	}
 
 	return buf.String(), nil

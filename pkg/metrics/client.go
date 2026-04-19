@@ -6,7 +6,7 @@ import (
 
 	"log/slog"
 
-	"github.com/bugsnag/bugsnag-go/v2"
+	"github.com/getsentry/sentry-go"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
@@ -55,13 +55,13 @@ func WithDefaultTags(tags map[string]string) Option {
 func (c *Client) publish(measurement string, fields map[string]interface{}, tags map[string]string) {
 	p := influxdb2.NewPoint(measurement, mergeTags(tags, c.defaultTags), fields, time.Now())
 	if err := c.writer.WritePoint(context.Background(), p); err != nil {
-		_ = bugsnag.Notify(errors.Wrap(err, "failed to publish metrics to influxdb"))
+		sentry.CaptureException(errors.Wrap(err, "failed to publish metrics to influxdb"))
 	}
 }
 
 func (c *Client) publishBatch(points []*write.Point) {
 	if err := c.writer.WritePoint(context.Background(), points...); err != nil {
-		_ = bugsnag.Notify(errors.Wrap(err, "failed to publish batch metrics to influxdb"))
+		sentry.CaptureException(errors.Wrap(err, "failed to publish batch metrics to influxdb"))
 	}
 }
 
