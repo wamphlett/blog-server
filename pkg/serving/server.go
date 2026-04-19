@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -14,8 +15,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rs/cors"
+	"log/slog"
+
 	"github.com/wamphlett/blog-server/pkg/model"
-	log "unknwon.dev/clog/v2"
 )
 
 // Metrics defines the metrics used by the server
@@ -262,7 +264,8 @@ func (s *Server) recordingMiddleware(next http.Handler) http.Handler {
 
 func (s *Server) ListenAndServe() {
 	if err := s.srv.ListenAndServe(); err != nil {
-		log.Fatal(errors.Wrap(err, "failed to serve").Error())
+		slog.Error("failed to serve", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -345,7 +348,7 @@ func neuter(next http.Handler) http.Handler {
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Do stuff here
-		log.Info(r.RequestURI)
+		slog.Info("request", "uri", r.RequestURI)
 		// Call the next handler, which can be another middleware in the chain, or the final handler.
 		next.ServeHTTP(w, r)
 	})

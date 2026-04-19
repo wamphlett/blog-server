@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
+	"log/slog"
+
 	"github.com/bugsnag/bugsnag-go/v2"
-	"github.com/go-clog/clog"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/api/write"
@@ -26,7 +27,7 @@ type Option func(*Client)
 
 // New creates a new metrics client with the given options
 func New(cfg *config.InfluxConfig, options ...Option) *Client {
-	clog.Info("Initialising new influxdb client")
+	slog.Info("initialising new influxdb client")
 	client := influxdb2.NewClient(cfg.Host, cfg.Token)
 	c := &Client{
 		influx:      client,

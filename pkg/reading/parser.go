@@ -7,14 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"log/slog"
+
 	"github.com/bugsnag/bugsnag-go/v2"
 	"github.com/pkg/errors"
-	log "unknwon.dev/clog/v2"
 )
 
 func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 	headers = make(map[string]string)
-	log.Info("parsing file headers: %s", path)
+	slog.Info("parsing file headers", "path", path)
 	file, err := os.Open(path)
 	if err != nil {
 		_ = bugsnag.Notify(errors.Wrap(err, "failed to parse file headers"))
@@ -42,7 +43,7 @@ func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 			}
 
 			if !strings.Contains(t, "<!--") {
-				log.Warn("missing headers from file: %s", path)
+				slog.Warn("missing headers from file", "path", path)
 				return
 			}
 			firstLine = false
@@ -57,7 +58,7 @@ func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 		colonIndex := strings.Index(t, ":")
 
 		if colonIndex == -1 {
-			log.Warn("invalid headers in file: %s (%s)", path, t)
+			slog.Warn("invalid headers in file", "path", path, "line", t)
 			_ = bugsnag.Notify(errors.New(fmt.Sprintf("invalid headers in file: %s (%s)", path, t)), bugsnag.MetaData{
 				"file": {
 					"path": path,

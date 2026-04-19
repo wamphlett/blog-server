@@ -2,7 +2,7 @@ package config
 
 import (
 	"context"
-	"log"
+	"os"
 
 	"github.com/bugsnag/bugsnag-go/v2"
 	"github.com/pkg/errors"
@@ -11,6 +11,9 @@ import (
 
 // Config defines the config values required to run the app
 type Config struct {
+	LogLevel  string `env:"LOG_LEVEL,default=INFO"`
+	LogFormat string `env:"LOG_FORMAT,default=json"`
+
 	Environment          string   `env:"ENVIRONMENT,default=development"`
 	ServerPort           int      `env:"PORT,default=3000"`
 	ServerAllowedOrigins []string `env:"ALLOWED_ORIGINS"`
@@ -52,7 +55,7 @@ func NewFromEnv() *Config {
 	if err := envconfig.Process(ctx, c); err != nil {
 		err = errors.Wrap(err, "failed to load config from env")
 		bugsnag.Notify(err)
-		log.Fatal(err)
+		os.Exit(1)
 	}
 
 	return c

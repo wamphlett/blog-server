@@ -8,10 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"log/slog"
+
 	"github.com/bugsnag/bugsnag-go/v2"
 	"github.com/pkg/errors"
 	"github.com/wamphlett/blog-server/pkg/model"
-	log "unknwon.dev/clog/v2"
 )
 
 type Database interface {
@@ -102,14 +103,14 @@ func New(contentPath, topicFile string, reader Reader, metrics Metrics, opts ...
 	// schedule further updates on the defined interval
 	go scheduleUpdates(u.refreshInterval, func() {
 		if err := u.Update(false); err != nil {
-			log.Error("error when updating content", err)
+			slog.Error("error when updating content", "error", err)
 		}
 		for _, callback := range u.callbacks {
 			callback()
 		}
 	})
 
-	log.Info("updater configured to refresh content every %.0f seconds", u.refreshInterval.Seconds())
+	slog.Info("updater configured to refresh content", "interval_seconds", u.refreshInterval.Seconds())
 
 	return u, nil
 }

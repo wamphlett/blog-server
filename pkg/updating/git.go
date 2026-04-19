@@ -2,10 +2,9 @@ package updating
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
-
-	log "unknwon.dev/clog/v2"
 )
 
 func (u *Updater) updateFromRemote(forceFresh bool) error {
@@ -30,7 +29,7 @@ func (u *Updater) updateFromRemote(forceFresh bool) error {
 
 // clone does a git clone from the remote repository
 func (u *Updater) clone() error {
-	log.Info("cloning %s", u.repo)
+	slog.Info("cloning repository", "repo", u.repo)
 	// clone the repo
 	cmd := exec.Command("git", "clone", u.repo, u.path)
 	if err := cmd.Run(); err != nil {
@@ -41,7 +40,7 @@ func (u *Updater) clone() error {
 
 // pull does a git pull from the remote repository
 func (u *Updater) pull() error {
-	log.Info("pulling changes from %s", u.repo)
+	slog.Info("pulling changes from repository", "repo", u.repo)
 	// Get the changes from the remote repo
 	cmd := exec.Command("git", "pull")
 	cmd.Env = []string{

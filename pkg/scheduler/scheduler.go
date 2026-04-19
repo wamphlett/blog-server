@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -46,7 +46,7 @@ func (s *Scheduler) calculateNextTime() time.Time {
 }
 
 func (s *Scheduler) reschedule() {
-	log("Rescheduling...")
+	slog.Info("rescheduling scheduler")
 	s.cancelCurrentContext()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -57,7 +57,7 @@ func (s *Scheduler) reschedule() {
 }
 
 func (s *Scheduler) runAtTime(ctx context.Context, t time.Time) {
-	log("task scheduled for %v", t)
+	slog.Info("task scheduled", "time", t)
 
 	for {
 		select {
@@ -71,6 +71,3 @@ func (s *Scheduler) runAtTime(ctx context.Context, t time.Time) {
 	}
 }
 
-func log(format string, a ...any) {
-	fmt.Printf("[scheduler] %s - %s\n", time.Now().Format("2006/01/02 15:04:05"), fmt.Sprintf(format, a...))
-}

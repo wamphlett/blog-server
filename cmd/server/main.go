@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/bugsnag/bugsnag-go/v2"
 	"github.com/pkg/errors"
-	log "unknwon.dev/clog/v2"
 
 	"github.com/wamphlett/blog-server/config"
 	"github.com/wamphlett/blog-server/pkg/indexing"
@@ -24,18 +24,12 @@ import (
 	"github.com/wamphlett/blog-server/pkg/updating"
 )
 
-func init() {
-	err := log.NewConsole()
-	if err != nil {
-		panic("unable to create new logger: " + err.Error())
-	}
-}
-
 func main() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT)
 
 	cfg := config.NewFromEnv()
+	setupLogger(cfg.LogLevel, cfg.LogFormat)
 	bugsnag.Configure(bugsnag.Configuration{APIKey: cfg.BugsnagApiKey})
 
 	// create a new metrics client
@@ -66,7 +60,8 @@ func main() {
 	if err != nil {
 		err = errors.Wrap(err, "failed to create updater")
 		bugsnag.Notify(err)
-		log.Fatal(err.Error())
+		slog.Error("failed to create updater", "error", err)
+		os.Exit(1)
 	}
 
 	// schedule a reindex every 24 hours
@@ -98,12 +93,12 @@ func updateReceiver(blogSitehost, secret string, db *database.Database, index *i
 		}
 
 		if len(updatedTopics) > 0 || len(updatedArticles) > 0 {
-			log.Info("reindexing after storing %d topics and %d articles", len(updatedTopics), len(updatedArticles))
+			slog.Info("reindexing after storing topics and articles", "topics", len(updatedTopics), "articles", len(updatedArticles))
 			index.Reindex()
 		}
 
 		if firstReceive {
-			log.Info("first receive, not clearing site cache")
+			slog.Info("first receive, not clearing site cache")
 			firstReceive = false
 			return
 		}
@@ -113,26 +108,41 @@ func updateReceiver(blogSitehost, secret string, db *database.Database, index *i
 		}
 
 		if blogSitehost == "" || secret == "" {
-			log.Warn("not clearing site cache as blog site host or secret is not set")
+			slog.Warn("not clearing site cache as blog site host or secret is not set")
 			return
 		}
 
 		for _, topic := range updatedTopics {
 			if err := invalidateSiteCaches(blogSitehost, topic.URI, secret); err != nil {
-				log.Error("failed to invalidate site cache for topic %s: %v", topic.URI, err)
+				slog.Error("failed to invalidate site cache for topic", "uri", topic.URI, "error", err)
 			}
 		}
 
 		for _, article := range updatedArticles {
 			if err := invalidateSiteCaches(blogSitehost, article.URI, secret); err != nil {
-				log.Error("failed to invalidate site cache for article %s: %v", article.URI, err)
+				slog.Error("failed to invalidate site cache for article", "uri", article.URI, "error", err)
 			}
 		}
 	}
 }
 
+func setupLogger(level, format string) {
+	var l slog.Level
+	if err := l.UnmarshalText([]byte(level)); err != nil {
+		l = slog.LevelInfo
+	}
+	opts := &slog.HandlerOptions{Level: l}
+	var handler slog.Handler
+	if format == "text" {
+		handler = slog.NewTextHandler(os.Stdout, opts)
+	} else {
+		handler = slog.NewJSONHandler(os.Stdout, opts)
+	}
+	slog.SetDefault(slog.New(handler))
+}
+
 func invalidateSiteCaches(host, path, secret string) error {
-	log.Info(fmt.Sprintf("invalidating site cache for %s", path))
+	slog.Info("invalidating site cache", "path", path)
 	url := fmt.Sprintf("%s/api/revalidate?path=%s&secret=%s", host, path, secret)
 
 	resp, err := http.Post(url, "application/json", nil)
