@@ -151,7 +151,7 @@ func setupLogger(level, format string) {
 }
 
 func invalidateSiteCaches(host, path, secret string) error {
-	slog.Info("invalidating site cache", "path", path)
+	slog.Info("invalidating site cache", "host", host, "path", path)
 	url := fmt.Sprintf("%s/api/revalidate?path=%s&secret=%s", host, path, secret)
 
 	resp, err := http.Post(url, "application/json", nil)
@@ -160,5 +160,6 @@ func invalidateSiteCaches(host, path, secret string) error {
 	}
 	defer resp.Body.Close()
 
+	slog.Info("site cache invalidated", "path", path, "status", resp.StatusCode)
 	return nil
 }
