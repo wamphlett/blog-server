@@ -2,12 +2,9 @@ package metrics
 
 import "time"
 
-// ContentUpdated records every time the content was updated
+// ContentUpdated records a completed content update cycle.
 func (c *Client) ContentUpdated(startTime time.Time) {
-	fields := map[string]interface{}{
-		"time_taken_ms":    time.Since(startTime).Milliseconds(),
-		"update_time_unix": startTime.UnixMilli(),
-		"count":            1,
-	}
-	c.publish("content_updated", fields, noTags())
+	c.contentUpdateDuration.Observe(time.Since(startTime).Seconds())
+	c.contentUpdatesTotal.Inc()
+	c.contentLastUpdated.SetToCurrentTime()
 }

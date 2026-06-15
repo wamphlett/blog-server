@@ -33,16 +33,7 @@ type Config struct {
 	// The name which topic files use, everything else will be considered an article
 	TopicFile string `env:"TOPIC_FILE,default=README.md"`
 
-	Influx    *InfluxConfig
 	SentryDSN string `env:"SENTRY_DSN"`
-}
-
-// InfluxConfig defines the config to load InfluxDB
-type InfluxConfig struct {
-	Host   string `env:"INFLUX_HOST"`
-	Bucket string `env:"INFLUX_BUCKET"`
-	Token  string `env:"INFLUX_TOKEN"`
-	Org    string `env:"INFLUX_ORG"`
 }
 
 // NewFromEnv reads the environment variables and creates a new config

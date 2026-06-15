@@ -2,11 +2,8 @@ package metrics
 
 import "time"
 
-// ParseFile records every time a file was parsed
+// ParseFile records the duration of a markdown file parse operation.
 func (c *Client) ParseFile(startTime time.Time) {
-	fields := map[string]interface{}{
-		"time_taken_ms": time.Since(startTime).Milliseconds(),
-		"count":         1,
-	}
-	c.publish("parse_file", fields, noTags())
+	c.parseFileDuration.Observe(time.Since(startTime).Seconds())
+	c.parseFileTotal.Inc()
 }

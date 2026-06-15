@@ -41,9 +41,7 @@ func main() {
 	}
 
 	// create a new metrics client
-	metricsClient := metrics.New(cfg.Influx, metrics.WithDefaultTags(map[string]string{
-		"environment": cfg.Environment,
-	}))
+	metricsClient := metrics.New()
 
 	// create a new in memory database
 	database := memorydatabase.New()
