@@ -86,7 +86,7 @@ All configuration is via environment variables.
 |----------|---------|-------------|
 | `PORT` | `3000` | Port to listen on. |
 | `ALLOWED_ORIGINS` | _(none)_ | Comma-separated list of allowed CORS origins. |
-| `ENVIRONMENT` | `development` | Environment name, attached to metrics as a tag. |
+| `ENVIRONMENT` | `development` | Environment name. |
 
 ### Content
 
@@ -120,10 +120,10 @@ When content changes, the server can notify an external site to purge its cache.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SENTRY_DSN` | _(none)_ | Sentry DSN for error reporting. |
-| `INFLUX_HOST` | _(none)_ | InfluxDB host URL. |
-| `INFLUX_BUCKET` | _(none)_ | InfluxDB bucket. |
-| `INFLUX_TOKEN` | _(none)_ | InfluxDB authentication token. |
-| `INFLUX_ORG` | _(none)_ | InfluxDB organisation. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(none)_ | OTLP gRPC endpoint for traces (e.g. `http://alloy:4317`). Tracing is disabled if unset. |
+| `OTEL_SERVICE_NAME` | `blog-server` | Service name attached to all trace spans. |
+
+Prometheus metrics are exposed at `/metrics` for scraping by Grafana Alloy or any Prometheus-compatible collector. No additional configuration is required.
 
 ## Running locally
 
