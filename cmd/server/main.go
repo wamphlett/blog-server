@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	"github.com/wamphlett/blog-server/pkg/reading"
 	"github.com/wamphlett/blog-server/pkg/scheduler"
 	"github.com/wamphlett/blog-server/pkg/serving"
+	"github.com/wamphlett/blog-server/pkg/telemetry"
 	"github.com/wamphlett/blog-server/pkg/updating"
 )
 
@@ -40,10 +42,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctx := context.Background()
+	shutdownTracing, err := telemetry.Setup(ctx, cfg.OtelEndpoint, cfg.OtelServiceName)
+	if err != nil {
+		slog.Error("failed to initialise tracing", "error", err)
+		os.Exit(1)
+	}
+	defer shutdownTracing(ctx)
+
 	// create a new metrics client
-	metricsClient := metrics.New(cfg.Influx, metrics.WithDefaultTags(map[string]string{
-		"environment": cfg.Environment,
-	}))
+	metricsClient := metrics.New()
 
 	// create a new in memory database
 	database := memorydatabase.New()
@@ -151,7 +159,7 @@ func setupLogger(level, format string) {
 }
 
 func invalidateSiteCaches(host, path, secret string) error {
-	slog.Info("invalidating site cache", "path", path)
+	slog.Info("invalidating site cache", "host", host, "path", path)
 	url := fmt.Sprintf("%s/api/revalidate?path=%s&secret=%s", host, path, secret)
 
 	resp, err := http.Post(url, "application/json", nil)
@@ -160,5 +168,6 @@ func invalidateSiteCaches(host, path, secret string) error {
 	}
 	defer resp.Body.Close()
 
+	slog.Info("site cache invalidated", "path", path, "status", resp.StatusCode)
 	return nil
 }

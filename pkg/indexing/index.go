@@ -1,11 +1,14 @@
 package indexing
 
 import (
+	"context"
 	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/otel"
 
 	"github.com/wamphlett/blog-server/pkg/model"
 )
@@ -126,6 +129,9 @@ func (i *Index) GetRecentArticles(limit int) []*model.Article {
 }
 
 func (i *Index) Reindex() {
+	_, span := otel.Tracer("blog-server").Start(context.Background(), "index.Reindex")
+	defer span.End()
+
 	startTime := time.Now()
 	slog.Info("reindexing")
 

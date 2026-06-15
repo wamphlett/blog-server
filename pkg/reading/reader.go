@@ -2,6 +2,7 @@ package reading
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +16,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/renderer/html"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // Metrics defines the metrics used by the reader
@@ -47,7 +50,11 @@ func New(index Index, staticContentURL, staticContentDir string, metrics Metrics
 }
 
 // ReadFileAsHTML reads the markdown file at the given location and returns the HTML version
-func (r *Reader) ReadFileAsHTML(filepath string) (string, error) {
+func (r *Reader) ReadFileAsHTML(ctx context.Context, filepath string) (string, error) {
+	_, span := otel.Tracer("blog-server").Start(ctx, "reading.ReadFileAsHTML")
+	span.SetAttributes(attribute.String("file.path", filepath))
+	defer span.End()
+
 	startTime := time.Now()
 	defer r.metrics.ParseFile(startTime)
 

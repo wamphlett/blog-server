@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,20 +15,21 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
-	"log/slog"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 
 	"github.com/wamphlett/blog-server/pkg/model"
 )
 
 // Metrics defines the metrics used by the server
 type Metrics interface {
-	Request(uri string, startTime time.Time)
+	Request(method, path string, status int, startTime time.Time)
 }
 
 // FileReader defines the methods required by the reader
 type FileReader interface {
-	ReadFileAsHTML(filepath string) (string, error)
+	ReadFileAsHTML(ctx context.Context, filepath string) (string, error)
 }
 
 // Index defines the methods required by the index
@@ -90,6 +92,7 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 	s.router.PathPrefix(fmt.Sprintf("/%s/", assetDir)).Handler(neuter(http.FileServer(http.Dir(contentDir))))
 
 	// set up server routes
+	s.router.Handle("/metrics", promhttp.Handler())
 	s.router.HandleFunc("/status", s.status)
 	s.router.HandleFunc("/overview", s.getOverview)
 	s.router.HandleFunc("/recent", s.getRecent)
@@ -97,8 +100,8 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 	s.router.HandleFunc("/topics/{topic}", s.getTopic)
 	s.router.HandleFunc("/topics/{topic}/articles", s.listArticles)
 	s.router.HandleFunc("/topics/{topic}/articles/{article}", s.getArticle)
-	s.router.Use(loggingMiddleware)
-	s.router.Use(s.recordingMiddleware)
+	s.router.Use(otelmux.Middleware("blog-server"))
+	s.router.Use(s.observabilityMiddleware)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: s.allowedOrigins,
@@ -124,7 +127,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getOverview(w http.ResponseWriter, r *http.Request) {
-	content, err := s.reader.ReadFileAsHTML(s.overviewFilePath)
+	content, err := s.reader.ReadFileAsHTML(r.Context(), s.overviewFilePath)
 	if err != nil {
 		slog.Error("failed to read overview file", "path", s.overviewFilePath, "error", err)
 		s.internalError(w, r)
@@ -209,7 +212,7 @@ func (s *Server) getArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := s.reader.ReadFileAsHTML(article.FilePath)
+	content, err := s.reader.ReadFileAsHTML(r.Context(), article.FilePath)
 	if err != nil {
 		slog.Error("failed to read article file", "topic", vars["topic"], "article", vars["article"], "error", err)
 		s.internalError(w, r)
@@ -231,7 +234,7 @@ func (s *Server) getTopic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := s.reader.ReadFileAsHTML(topic.FilePath)
+	content, err := s.reader.ReadFileAsHTML(r.Context(), topic.FilePath)
 	if err != nil {
 		slog.Error("failed to read topic file", "topic", vars["topic"], "error", err)
 		s.internalError(w, r)
@@ -255,11 +258,32 @@ func (s *Server) internalError(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(ErrorResponse{"internal error"})
 }
 
-func (s *Server) recordingMiddleware(next http.Handler) http.Handler {
+func (s *Server) observabilityMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		startTime := time.Now()
-		defer s.metrics.Request(r.RequestURI, startTime)
-		next.ServeHTTP(w, r)
+		start := time.Now()
+		rw := &responseWriter{ResponseWriter: w}
+		next.ServeHTTP(rw, r)
+
+		status := rw.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+
+		s.metrics.Request(r.Method, r.URL.Path, status, start)
+
+		logFn := slog.Info
+		if status >= 500 {
+			logFn = slog.Error
+		} else if status >= 400 {
+			logFn = slog.Warn
+		}
+		logFn("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", status,
+			"duration_ms", time.Since(start).Milliseconds(),
+			"remote_addr", r.RemoteAddr,
+		)
 	})
 }
 
@@ -347,9 +371,20 @@ func neuter(next http.Handler) http.Handler {
 	})
 }
 
-func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		slog.Info("request", "method", r.Method, "uri", r.RequestURI)
-		next.ServeHTTP(w, r)
-	})
+type responseWriter struct {
+	http.ResponseWriter
+	status int
 }
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.status = code
+	rw.ResponseWriter.WriteHeader(code)
+}
+
+func (rw *responseWriter) Write(b []byte) (int, error) {
+	if rw.status == 0 {
+		rw.status = http.StatusOK
+	}
+	return rw.ResponseWriter.Write(b)
+}
+

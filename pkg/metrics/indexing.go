@@ -2,31 +2,16 @@ package metrics
 
 import "time"
 
-// Indexed records every time the content was indexed
+// Indexed records a completed indexing operation.
 func (c *Client) Indexed(startTime time.Time, topicCount, articleCount int) {
-	fields := map[string]interface{}{
-		"time_taken_ms": time.Since(startTime).Milliseconds(),
-		"count":         1,
-		"topic_count":   topicCount,
-		"article_count": articleCount,
-	}
-	c.publish("indexed", fields, noTags())
+	c.indexDuration.Observe(time.Since(startTime).Seconds())
+	c.indexTotal.Inc()
+	c.topicsTotal.Set(float64(topicCount))
+	c.articlesTotal.Set(float64(articleCount))
 }
 
-// ParseHeaders records every time headers were parsed
+// ParseHeaders records the duration of a content header parse operation.
 func (c *Client) ParseHeaders(startTime time.Time) {
-	fields := map[string]interface{}{
-		"time_taken_ms": time.Since(startTime).Milliseconds(),
-		"count":         1,
-	}
-	c.publish("parse_headers", fields, noTags())
-}
-
-// ReadFile records every time a file was read
-func (c *Client) ReadFile(fileType string) {
-	fields := map[string]interface{}{
-		"file_type": fileType,
-		"count":     1,
-	}
-	c.publish("read_file", fields, noTags())
+	c.parseHeadersDuration.Observe(time.Since(startTime).Seconds())
+	c.parseHeadersTotal.Inc()
 }
