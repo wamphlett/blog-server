@@ -34,6 +34,9 @@ type Config struct {
 	TopicFile string `env:"TOPIC_FILE,default=README.md"`
 
 	SentryDSN string `env:"SENTRY_DSN"`
+
+	OtelEndpoint    string `env:"OTEL_EXPORTER_OTLP_ENDPOINT"`
+	OtelServiceName string `env:"OTEL_SERVICE_NAME,default=blog-server"`
 }
 
 // NewFromEnv reads the environment variables and creates a new config

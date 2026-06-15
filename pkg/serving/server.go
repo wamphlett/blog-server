@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 
 	"github.com/wamphlett/blog-server/pkg/model"
 )
@@ -28,7 +29,7 @@ type Metrics interface {
 
 // FileReader defines the methods required by the reader
 type FileReader interface {
-	ReadFileAsHTML(filepath string) (string, error)
+	ReadFileAsHTML(ctx context.Context, filepath string) (string, error)
 }
 
 // Index defines the methods required by the index
@@ -99,6 +100,7 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 	s.router.HandleFunc("/topics/{topic}", s.getTopic)
 	s.router.HandleFunc("/topics/{topic}/articles", s.listArticles)
 	s.router.HandleFunc("/topics/{topic}/articles/{article}", s.getArticle)
+	s.router.Use(otelmux.Middleware("blog-server"))
 	s.router.Use(s.observabilityMiddleware)
 
 	c := cors.New(cors.Options{
@@ -125,7 +127,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) getOverview(w http.ResponseWriter, r *http.Request) {
-	content, err := s.reader.ReadFileAsHTML(s.overviewFilePath)
+	content, err := s.reader.ReadFileAsHTML(r.Context(), s.overviewFilePath)
 	if err != nil {
 		slog.Error("failed to read overview file", "path", s.overviewFilePath, "error", err)
 		s.internalError(w, r)
@@ -210,7 +212,7 @@ func (s *Server) getArticle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := s.reader.ReadFileAsHTML(article.FilePath)
+	content, err := s.reader.ReadFileAsHTML(r.Context(), article.FilePath)
 	if err != nil {
 		slog.Error("failed to read article file", "topic", vars["topic"], "article", vars["article"], "error", err)
 		s.internalError(w, r)
@@ -232,7 +234,7 @@ func (s *Server) getTopic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := s.reader.ReadFileAsHTML(topic.FilePath)
+	content, err := s.reader.ReadFileAsHTML(r.Context(), topic.FilePath)
 	if err != nil {
 		slog.Error("failed to read topic file", "topic", vars["topic"], "error", err)
 		s.internalError(w, r)

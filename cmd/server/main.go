@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	"github.com/wamphlett/blog-server/pkg/reading"
 	"github.com/wamphlett/blog-server/pkg/scheduler"
 	"github.com/wamphlett/blog-server/pkg/serving"
+	"github.com/wamphlett/blog-server/pkg/telemetry"
 	"github.com/wamphlett/blog-server/pkg/updating"
 )
 
@@ -39,6 +41,14 @@ func main() {
 		sentry.Flush(2 * time.Second)
 		os.Exit(1)
 	}
+
+	ctx := context.Background()
+	shutdownTracing, err := telemetry.Setup(ctx, cfg.OtelEndpoint, cfg.OtelServiceName)
+	if err != nil {
+		slog.Error("failed to initialise tracing", "error", err)
+		os.Exit(1)
+	}
+	defer shutdownTracing(ctx)
 
 	// create a new metrics client
 	metricsClient := metrics.New()

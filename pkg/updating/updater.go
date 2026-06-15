@@ -1,6 +1,7 @@
 package updating
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -12,6 +13,9 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/wamphlett/blog-server/pkg/model"
 )
 
@@ -117,6 +121,10 @@ func New(contentPath, topicFile string, reader Reader, metrics Metrics, opts ...
 
 // Update updates the content from the remote repository
 func (u *Updater) Update(forceFresh bool) error {
+	_, span := otel.Tracer("blog-server").Start(context.Background(), "update.Update")
+	span.SetAttributes(attribute.Bool("force_fresh", forceFresh))
+	defer span.End()
+
 	startTime := time.Now()
 	slog.Info("updating content", "force_fresh", forceFresh)
 	defer u.metrics.ContentUpdated(startTime)
