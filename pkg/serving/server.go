@@ -47,6 +47,7 @@ type Server struct {
 	reader           FileReader
 	index            Index
 	srv              *http.Server
+	metricsSrv       *http.Server
 	router           *mux.Router
 	overviewFilePath string
 	metrics          Metrics
@@ -92,7 +93,6 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 	s.router.PathPrefix(fmt.Sprintf("/%s/", assetDir)).Handler(neuter(http.FileServer(http.Dir(contentDir))))
 
 	// set up server routes
-	s.router.Handle("/metrics", promhttp.Handler())
 	s.router.HandleFunc("/status", s.status)
 	s.router.HandleFunc("/overview", s.getOverview)
 	s.router.HandleFunc("/recent", s.getRecent)
@@ -113,6 +113,11 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
 		Handler:      c.Handler(s.router),
+	}
+
+	s.metricsSrv = &http.Server{
+		Addr:    "0.0.0.0:9091",
+		Handler: promhttp.Handler(),
 	}
 
 	return s
@@ -288,8 +293,15 @@ func (s *Server) observabilityMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) ListenAndServe() {
+	go func() {
+		slog.Info("metrics server listening", "addr", s.metricsSrv.Addr)
+		if err := s.metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("failed to serve metrics", "error", err)
+		}
+	}()
+
 	slog.Info("server listening", "addr", s.srv.Addr)
-	if err := s.srv.ListenAndServe(); err != nil {
+	if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("failed to serve", "error", err)
 		os.Exit(1)
 	}
@@ -301,6 +313,9 @@ func (s *Server) Shutdown() {
 	defer cancel()
 	if err := s.srv.Shutdown(ctx); err != nil {
 		slog.Error("server shutdown error", "error", err)
+	}
+	if err := s.metricsSrv.Shutdown(ctx); err != nil {
+		slog.Error("metrics server shutdown error", "error", err)
 	}
 }
 
