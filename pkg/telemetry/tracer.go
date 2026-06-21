@@ -3,17 +3,19 @@ package telemetry
 import (
 	"context"
 	"log/slog"
+	"os"
 
+	"github.com/shirou/gopsutil/v4/process"
 	"go.opentelemetry.io/contrib/instrumentation/host"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/resource"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 )
@@ -69,7 +71,7 @@ func Setup(ctx context.Context, endpoint, serviceName string) (func(context.Cont
 		sdkmetric.WithView(sdkmetric.NewView(
 			sdkmetric.Instrument{Kind: sdkmetric.InstrumentKindHistogram},
 			sdkmetric.Stream{
-				Aggregation: metric.AggregationExplicitBucketHistogram{
+				Aggregation: sdkmetric.AggregationExplicitBucketHistogram{
 					Boundaries: []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10},
 				},
 			},
@@ -83,6 +85,9 @@ func Setup(ctx context.Context, endpoint, serviceName string) (func(context.Cont
 	if err := host.Start(); err != nil {
 		return nil, err
 	}
+	if err := registerOpenFDsMetric(ctx, mp); err != nil {
+		return nil, err
+	}
 
 	slog.InfoContext(ctx, "telemetry initialised", "endpoint", endpoint, "service", serviceName)
 
@@ -92,4 +97,29 @@ func Setup(ctx context.Context, endpoint, serviceName string) (func(context.Cont
 		}
 		return mp.Shutdown(ctx)
 	}, nil
+}
+
+func registerOpenFDsMetric(ctx context.Context, mp *sdkmetric.MeterProvider) error {
+	proc, err := process.NewProcess(int32(os.Getpid()))
+	if err != nil {
+		return err
+	}
+
+	gauge, err := mp.Meter(InstrumentationName).Int64ObservableGauge(
+		"process.open_fds",
+		metric.WithDescription("Number of open file descriptors held by the process."),
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = mp.Meter(InstrumentationName).RegisterCallback(func(_ context.Context, o metric.Observer) error {
+		n, err := proc.NumFDs()
+		if err != nil {
+			return err
+		}
+		o.ObserveInt64(gauge, int64(n))
+		return nil
+	}, gauge)
+	return err
 }
