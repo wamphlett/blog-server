@@ -40,7 +40,9 @@ func Setup(ctx context.Context, endpoint, serviceName string) (func(context.Cont
 	}
 
 	// Trace setup — gRPC exporter reads OTEL_EXPORTER_OTLP_ENDPOINT from env.
-	traceExporter, err := otlptracegrpc.New(ctx)
+	// WithInsecure avoids gRPC's TLS cert watcher (fsnotify) which exhausts
+	// the container's open file descriptors.
+	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +57,7 @@ func Setup(ctx context.Context, endpoint, serviceName string) (func(context.Cont
 	))
 
 	// Metric setup — shared resource, explicit buckets, cumulative temporality.
-	metricExporter, err := otlpmetricgrpc.New(ctx)
+	metricExporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
