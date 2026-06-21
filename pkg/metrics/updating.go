@@ -1,10 +1,13 @@
 package metrics
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // ContentUpdated records a completed content update cycle.
-func (c *Client) ContentUpdated(startTime time.Time) {
-	c.contentUpdateDuration.Observe(time.Since(startTime).Seconds())
-	c.contentUpdatesTotal.Inc()
-	c.contentLastUpdated.SetToCurrentTime()
+func (c *Client) ContentUpdated(ctx context.Context, startTime time.Time) {
+	c.contentUpdateDuration.Record(ctx, time.Since(startTime).Seconds())
+	c.contentUpdatesCount.Add(ctx, 1)
+	c.lastContentUpdateNano.Store(time.Now().UnixNano())
 }

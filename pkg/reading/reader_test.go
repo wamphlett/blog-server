@@ -11,8 +11,8 @@ import (
 
 type MockMetrics struct{}
 
-func (m *MockMetrics) ParseFile(startTime time.Time)    {}
-func (m *MockMetrics) ParseHeaders(startTime time.Time) {}
+func (m *MockMetrics) ParseFile(_ context.Context, startTime time.Time)    {}
+func (m *MockMetrics) ParseHeaders(_ context.Context, startTime time.Time) {}
 
 func TestReadsFileAsHTMLStripsProperties(t *testing.T) {
 	reader := reading.New(nil, "", "", &MockMetrics{})

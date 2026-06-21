@@ -1,14 +1,19 @@
 package metrics
 
 import (
-	"strconv"
+	"context"
 	"time"
+
+	otelmetric "go.opentelemetry.io/otel/metric"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-// Request records the duration and count of an HTTP request.
-func (c *Client) Request(method, path string, status int, startTime time.Time) {
-	statusCode := strconv.Itoa(status)
-	duration := time.Since(startTime).Seconds()
-	c.httpRequestDuration.WithLabelValues(method, path, statusCode).Observe(duration)
-	c.httpRequestsTotal.WithLabelValues(method, path, statusCode).Inc()
+// Request records the duration of an HTTP request.
+func (c *Client) Request(ctx context.Context, method string, status int, startTime time.Time) {
+	c.httpRequestDuration.Record(ctx, time.Since(startTime).Seconds(),
+		otelmetric.WithAttributes(
+			semconv.HTTPRequestMethodKey.String(method),
+			semconv.HTTPResponseStatusCodeKey.Int(status),
+		),
+	)
 }

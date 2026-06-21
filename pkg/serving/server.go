@@ -15,16 +15,17 @@ import (
 	"github.com/getsentry/sentry-go"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/cors"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
+
+	"github.com/wamphlett/blog-server/pkg/telemetry"
 
 	"github.com/wamphlett/blog-server/pkg/model"
 )
 
 // Metrics defines the metrics used by the server
 type Metrics interface {
-	Request(method, path string, status int, startTime time.Time)
+	Request(ctx context.Context, method string, status int, startTime time.Time)
 }
 
 // FileReader defines the methods required by the reader
@@ -47,7 +48,6 @@ type Server struct {
 	reader           FileReader
 	index            Index
 	srv              *http.Server
-	metricsSrv       *http.Server
 	router           *mux.Router
 	overviewFilePath string
 	metrics          Metrics
@@ -100,7 +100,7 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 	s.router.HandleFunc("/topics/{topic}", s.getTopic)
 	s.router.HandleFunc("/topics/{topic}/articles", s.listArticles)
 	s.router.HandleFunc("/topics/{topic}/articles/{article}", s.getArticle)
-	s.router.Use(otelmux.Middleware("blog-server"))
+	s.router.Use(otelmux.Middleware(telemetry.InstrumentationName))
 	s.router.Use(s.observabilityMiddleware)
 
 	c := cors.New(cors.Options{
@@ -113,11 +113,6 @@ func New(reader FileReader, index Index, contentDir, assetDir, overviewFilePath 
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
 		Handler:      c.Handler(s.router),
-	}
-
-	s.metricsSrv = &http.Server{
-		Addr:    "0.0.0.0:9091",
-		Handler: promhttp.Handler(),
 	}
 
 	return s
@@ -134,7 +129,7 @@ func (s *Server) status(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getOverview(w http.ResponseWriter, r *http.Request) {
 	content, err := s.reader.ReadFileAsHTML(r.Context(), s.overviewFilePath)
 	if err != nil {
-		slog.Error("failed to read overview file", "path", s.overviewFilePath, "error", err)
+		slog.ErrorContext(r.Context(), "failed to read overview file", "path", s.overviewFilePath, "error", err)
 		s.internalError(w, r)
 		return
 	}
@@ -156,7 +151,7 @@ func (s *Server) getRecent(w http.ResponseWriter, r *http.Request) {
 	for i, article := range recentArticles {
 		articleTopic := s.index.GetTopicByIdentifier(article.TopicSlug)
 		if articleTopic == nil {
-			slog.Error("failed to find topic for article", "article", article.Slug)
+			slog.ErrorContext(r.Context(), "failed to find topic for article", "article", article.Slug)
 			sentry.CaptureException(errors.Errorf("failed to find topic for article %s", article.Slug))
 			continue
 		}
@@ -219,7 +214,7 @@ func (s *Server) getArticle(w http.ResponseWriter, r *http.Request) {
 
 	content, err := s.reader.ReadFileAsHTML(r.Context(), article.FilePath)
 	if err != nil {
-		slog.Error("failed to read article file", "topic", vars["topic"], "article", vars["article"], "error", err)
+		slog.ErrorContext(r.Context(), "failed to read article file", "topic", vars["topic"], "article", vars["article"], "error", err)
 		s.internalError(w, r)
 		return
 	}
@@ -241,7 +236,7 @@ func (s *Server) getTopic(w http.ResponseWriter, r *http.Request) {
 
 	content, err := s.reader.ReadFileAsHTML(r.Context(), topic.FilePath)
 	if err != nil {
-		slog.Error("failed to read topic file", "topic", vars["topic"], "error", err)
+		slog.ErrorContext(r.Context(), "failed to read topic file", "topic", vars["topic"], "error", err)
 		s.internalError(w, r)
 		return
 	}
@@ -274,15 +269,15 @@ func (s *Server) observabilityMiddleware(next http.Handler) http.Handler {
 			status = http.StatusOK
 		}
 
-		s.metrics.Request(r.Method, r.URL.Path, status, start)
+		s.metrics.Request(r.Context(), r.Method, status, start)
 
-		logFn := slog.Info
+		level := slog.LevelInfo
 		if status >= 500 {
-			logFn = slog.Error
+			level = slog.LevelError
 		} else if status >= 400 {
-			logFn = slog.Warn
+			level = slog.LevelWarn
 		}
-		logFn("request",
+		slog.Log(r.Context(), level, "request",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", status,
@@ -293,13 +288,6 @@ func (s *Server) observabilityMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) ListenAndServe() {
-	go func() {
-		slog.Info("metrics server listening", "addr", s.metricsSrv.Addr)
-		if err := s.metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("failed to serve metrics", "error", err)
-		}
-	}()
-
 	slog.Info("server listening", "addr", s.srv.Addr)
 	if err := s.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		slog.Error("failed to serve", "error", err)
@@ -313,9 +301,6 @@ func (s *Server) Shutdown() {
 	defer cancel()
 	if err := s.srv.Shutdown(ctx); err != nil {
 		slog.Error("server shutdown error", "error", err)
-	}
-	if err := s.metricsSrv.Shutdown(ctx); err != nil {
-		slog.Error("metrics server shutdown error", "error", err)
 	}
 }
 

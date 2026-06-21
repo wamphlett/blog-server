@@ -1,17 +1,13 @@
 package metrics
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Indexed records a completed indexing operation.
-func (c *Client) Indexed(startTime time.Time, topicCount, articleCount int) {
-	c.indexDuration.Observe(time.Since(startTime).Seconds())
-	c.indexTotal.Inc()
-	c.topicsTotal.Set(float64(topicCount))
-	c.articlesTotal.Set(float64(articleCount))
-}
-
-// ParseHeaders records the duration of a content header parse operation.
-func (c *Client) ParseHeaders(startTime time.Time) {
-	c.parseHeadersDuration.Observe(time.Since(startTime).Seconds())
-	c.parseHeadersTotal.Inc()
+func (c *Client) Indexed(ctx context.Context, startTime time.Time, topicCount, articleCount int) {
+	c.indexDuration.Record(ctx, time.Since(startTime).Seconds())
+	c.topicsCount.Record(ctx, int64(topicCount))
+	c.articlesCount.Record(ctx, int64(articleCount))
 }

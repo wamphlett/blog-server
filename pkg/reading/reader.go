@@ -18,12 +18,16 @@ import (
 	"github.com/yuin/goldmark/renderer/html"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/wamphlett/blog-server/pkg/telemetry"
 )
+
+var tracer = otel.Tracer(telemetry.InstrumentationName)
 
 // Metrics defines the metrics used by the reader
 type Metrics interface {
-	ParseFile(startTime time.Time)
-	ParseHeaders(startTime time.Time)
+	ParseFile(ctx context.Context, startTime time.Time)
+	ParseHeaders(ctx context.Context, startTime time.Time)
 }
 
 // Index defines the methods required by the index
@@ -51,16 +55,16 @@ func New(index Index, staticContentURL, staticContentDir string, metrics Metrics
 
 // ReadFileAsHTML reads the markdown file at the given location and returns the HTML version
 func (r *Reader) ReadFileAsHTML(ctx context.Context, filepath string) (string, error) {
-	_, span := otel.Tracer("blog-server").Start(ctx, "reading.ReadFileAsHTML")
+	_, span := tracer.Start(ctx, "reading.ReadFileAsHTML")
 	span.SetAttributes(attribute.String("file.path", filepath))
 	defer span.End()
 
 	startTime := time.Now()
-	defer r.metrics.ParseFile(startTime)
+	defer r.metrics.ParseFile(ctx, startTime)
 
 	b, err := os.ReadFile(filepath)
 	if err != nil {
-		slog.Error("failed to read file", "path", filepath, "error", err)
+		slog.ErrorContext(ctx, "failed to read file", "path", filepath, "error", err)
 		return "", errors.Wrap(err, "failed to read article file")
 	}
 
@@ -76,7 +80,7 @@ func (r *Reader) ReadFileAsHTML(ctx context.Context, filepath string) (string, e
 	)
 	var buf bytes.Buffer
 	if err := md.Convert([]byte(contents), &buf); err != nil {
-		slog.Error("failed to parse markdown", "path", filepath, "error", err)
+		slog.ErrorContext(ctx, "failed to parse markdown", "path", filepath, "error", err)
 		sentry.CaptureException(errors.Wrapf(err, "failed to parse file: %s", filepath))
 	}
 

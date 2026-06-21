@@ -155,7 +155,7 @@ func setupLogger(level, format string) {
 	} else {
 		handler = slog.NewJSONHandler(os.Stdout, opts)
 	}
-	slog.SetDefault(slog.New(handler))
+	slog.SetDefault(slog.New(telemetry.NewTraceHandler(handler)))
 }
 
 func invalidateSiteCaches(host, path, secret string) error {

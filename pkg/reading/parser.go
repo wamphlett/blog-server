@@ -2,6 +2,7 @@ package reading
 
 import (
 	"bufio"
+	"context"
 	"os"
 	"strings"
 	"time"
@@ -23,7 +24,7 @@ func (r *Reader) parseFileHeaders(path string) (headers map[string]string) {
 	defer file.Close()
 
 	startTime := time.Now()
-	defer r.metrics.ParseHeaders(startTime)
+	defer r.metrics.ParseHeaders(context.Background(), startTime)
 
 	// scan the top of the file to look for a comment block containing the tags
 	scanner := bufio.NewScanner(file)

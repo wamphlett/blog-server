@@ -11,7 +11,10 @@ import (
 	"go.opentelemetry.io/otel"
 
 	"github.com/wamphlett/blog-server/pkg/model"
+	"github.com/wamphlett/blog-server/pkg/telemetry"
 )
+
+var tracer = otel.Tracer(telemetry.InstrumentationName)
 
 type Database interface {
 	GetAllTopics() []*model.Topic
@@ -30,7 +33,7 @@ func WithReindexedCallback(callback ReindexedCallback) Option {
 
 // Metrics defines the metrics used by the index
 type Metrics interface {
-	Indexed(startTime time.Time, topicCount, articleCount int)
+	Indexed(ctx context.Context, startTime time.Time, topicCount, articleCount int)
 }
 
 type ReindexResults struct {
@@ -129,11 +132,11 @@ func (i *Index) GetRecentArticles(limit int) []*model.Article {
 }
 
 func (i *Index) Reindex() {
-	_, span := otel.Tracer("blog-server").Start(context.Background(), "index.Reindex")
+	ctx, span := tracer.Start(context.Background(), "index.Reindex")
 	defer span.End()
 
 	startTime := time.Now()
-	slog.Info("reindexing")
+	slog.InfoContext(ctx, "reindexing")
 
 	topics := i.database.GetAllTopics()
 	articles := i.database.GetAllArticles()
@@ -145,9 +148,9 @@ func (i *Index) Reindex() {
 	i.indexByURIsByFilepath(topics, articles)
 
 	i.lastIndexed = startTime
-	i.metrics.Indexed(startTime, len(topics), len(articles))
+	i.metrics.Indexed(ctx, startTime, len(topics), len(articles))
 
-	slog.Info("reindex complete", "topics", len(topics), "articles", len(articles), "duration", time.Since(startTime))
+	slog.InfoContext(ctx, "reindex complete", "topics", len(topics), "articles", len(articles), "duration", time.Since(startTime))
 }
 
 func (i *Index) indexArticlesByTime(articles []*model.Article) {

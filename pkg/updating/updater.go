@@ -17,7 +17,10 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/wamphlett/blog-server/pkg/model"
+	"github.com/wamphlett/blog-server/pkg/telemetry"
 )
+
+var tracer = otel.Tracer(telemetry.InstrumentationName)
 
 type Database interface {
 	SetTopics(topic *model.Topic) error
@@ -28,7 +31,7 @@ type Receiver func(topic []*model.Topic, article []*model.Article)
 
 // Metrics defines the metrics used by the updater
 type Metrics interface {
-	ContentUpdated(startTime time.Time)
+	ContentUpdated(ctx context.Context, startTime time.Time)
 }
 
 type Reader interface {
@@ -121,17 +124,17 @@ func New(contentPath, topicFile string, reader Reader, metrics Metrics, opts ...
 
 // Update updates the content from the remote repository
 func (u *Updater) Update(forceFresh bool) error {
-	_, span := otel.Tracer("blog-server").Start(context.Background(), "update.Update")
+	ctx, span := tracer.Start(context.Background(), "update.Update")
 	span.SetAttributes(attribute.Bool("force_fresh", forceFresh))
 	defer span.End()
 
 	startTime := time.Now()
-	slog.Info("updating content", "force_fresh", forceFresh)
-	defer u.metrics.ContentUpdated(startTime)
+	slog.InfoContext(ctx, "updating content", "force_fresh", forceFresh)
+	defer u.metrics.ContentUpdated(ctx, startTime)
 
 	if u.repo != "" {
-		if err := u.updateFromRemote(forceFresh); err != nil {
-			slog.Error("failed to update from remote", "error", err)
+		if err := u.updateFromRemote(ctx, forceFresh); err != nil {
+			slog.ErrorContext(ctx, "failed to update from remote", "error", err)
 			return err
 		}
 	}
@@ -141,7 +144,7 @@ func (u *Updater) Update(forceFresh bool) error {
 		return err
 	}
 
-	slog.Info("content update complete", "changed_topics", len(topics), "changed_articles", len(articles), "duration", time.Since(startTime))
+	slog.InfoContext(ctx, "content update complete", "changed_topics", len(topics), "changed_articles", len(articles), "duration", time.Since(startTime))
 
 	for _, receiver := range u.receivers {
 		receiver(topics, articles)
