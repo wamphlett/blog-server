@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 
+	"go.opentelemetry.io/contrib/instrumentation/host"
+	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
@@ -74,6 +76,13 @@ func Setup(ctx context.Context, endpoint, serviceName string) (func(context.Cont
 		)),
 	)
 	otel.SetMeterProvider(mp)
+
+	if err := runtime.Start(); err != nil {
+		return nil, err
+	}
+	if err := host.Start(); err != nil {
+		return nil, err
+	}
 
 	slog.InfoContext(ctx, "telemetry initialised", "endpoint", endpoint, "service", serviceName)
 
