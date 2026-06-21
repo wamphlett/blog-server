@@ -120,10 +120,10 @@ When content changes, the server can notify an external site to purge its cache.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SENTRY_DSN` | _(none)_ | Sentry DSN for error reporting. |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(none)_ | OTLP gRPC endpoint for traces (e.g. `http://alloy:4317`). Tracing is disabled if unset. |
-| `OTEL_SERVICE_NAME` | `blog-server` | Service name attached to all trace spans. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(none)_ | OTLP gRPC endpoint for traces and metrics (e.g. `http://alloy:4317`). Telemetry is disabled if unset. |
+| `OTEL_SERVICE_NAME` | `blog-server` | Service name attached to all telemetry. |
 
-Prometheus metrics are exposed at `/metrics` for scraping by Grafana Alloy or any Prometheus-compatible collector. No additional configuration is required.
+When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, the server exports both traces and metrics (including host and Go runtime metrics) to the configured OTLP gRPC endpoint.
 
 ## Running locally
 
