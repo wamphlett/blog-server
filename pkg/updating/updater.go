@@ -139,21 +139,30 @@ func (u *Updater) Update(forceFresh bool) error {
 		}
 	}
 
-	topics, articles, err := u.readFiles()
+	topics, articles, err := u.readFiles(ctx)
 	if err != nil {
 		return err
 	}
 
 	slog.InfoContext(ctx, "content update complete", "changed_topics", len(topics), "changed_articles", len(articles), "duration", time.Since(startTime))
 
+	_, receiversSpan := tracer.Start(ctx, "update.NotifyReceivers")
+	receiversSpan.SetAttributes(
+		attribute.Int("receiver_count", len(u.receivers)),
+		attribute.Int("changed_topics", len(topics)),
+		attribute.Int("changed_articles", len(articles)),
+	)
 	for _, receiver := range u.receivers {
 		receiver(topics, articles)
 	}
+	receiversSpan.End()
 
 	return nil
 }
 
-func (u *Updater) readFiles() ([]*model.Topic, []*model.Article, error) {
+func (u *Updater) readFiles(ctx context.Context) ([]*model.Topic, []*model.Article, error) {
+	ctx, span := tracer.Start(ctx, "update.ReadFiles")
+	defer span.End()
 	// read the main content directory to look for topic directories
 	files, err := os.ReadDir(u.path)
 	if err != nil {
@@ -226,6 +235,10 @@ func (u *Updater) readFiles() ([]*model.Topic, []*model.Article, error) {
 		}
 	}
 
+	span.SetAttributes(
+		attribute.Int("changed_topics", len(topics)),
+		attribute.Int("changed_articles", len(articles)),
+	)
 	return topics, articles, nil
 }
 
