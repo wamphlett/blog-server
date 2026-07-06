@@ -36,7 +36,8 @@ func (s *Scheduler) cancelCurrentContext() {
 }
 
 func (s *Scheduler) calculateNextTime() time.Time {
-	now := time.Now()
+	// interpret the schedule in the location of the configured time
+	now := time.Now().In(s.timeToExecute.Location())
 
 	nextTime := time.Date(now.Year(), now.Month(), now.Day(), s.timeToExecute.Hour(), s.timeToExecute.Minute(), s.timeToExecute.Second(), 0, now.Location())
 	if nextTime.Before(now) {

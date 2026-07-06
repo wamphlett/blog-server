@@ -80,8 +80,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// schedule a reindex every 24 hours
-	scheduler := scheduler.New(time.Date(0, 0, 0, 0, 1, 0, 0, time.Local), func() {
+	// schedule a reindex every 24 hours, just after midnight UTC so articles
+	// published on a new day (dates are parsed as midnight UTC) are picked up
+	scheduler := scheduler.New(time.Date(0, 0, 0, 0, 1, 0, 0, time.UTC), func() {
 		indexer.Reindex()
 		invalidateSiteCaches(cfg.BlogSiteHost, "/", cfg.BlogSiteSecret)
 	})
