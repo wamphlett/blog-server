@@ -41,6 +41,7 @@ type Index interface {
 	GetArticleByIdentifier(topicIdentidier, identifier string) *model.Article
 	GetAllArticlesForTopic(topicIdentifier string) []*model.Article
 	GetRecentArticles(limit int) []*model.Article
+	GetArticlesInSeries(series string) []*model.Article
 }
 
 // Server defines a new server
@@ -223,7 +224,35 @@ func (s *Server) getArticle(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(GetArticleResponse{
 		convertArticle(topic, article),
 		HtmlResponse{content},
+		s.buildSeries(article),
 	})
+}
+
+// buildSeries returns the series payload for an article, or nil if the
+// article does not belong to a series
+func (s *Server) buildSeries(article *model.Article) *Series {
+	seriesName := article.Series()
+	if seriesName == "" {
+		return nil
+	}
+
+	seriesArticles := s.index.GetArticlesInSeries(seriesName)
+	articles := make([]SeriesArticle, len(seriesArticles))
+	for i, a := range seriesArticles {
+		articles[i] = SeriesArticle{
+			Title:       a.Title,
+			Slug:        a.Slug,
+			TopicSlug:   a.TopicSlug,
+			URL:         fmt.Sprintf("/topics/%s/articles/%s", a.TopicSlug, a.Slug),
+			PublishedAt: a.PublishedAt,
+			Published:   a.IsPublished(),
+		}
+	}
+
+	return &Series{
+		Name:     seriesName,
+		Articles: articles,
+	}
 }
 
 func (s *Server) getTopic(w http.ResponseWriter, r *http.Request) {

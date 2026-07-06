@@ -159,6 +159,54 @@ func TestGetRecentArticles_ExcludesUnpublished(t *testing.T) {
 	assert.Equal(t, "published", recent[0].Slug)
 }
 
+// verifies that articles in a series are returned ordered by published date (oldest
+// first), grouped globally across topics, with case-insensitive series names
+func TestGetArticlesInSeries(t *testing.T) {
+	past := time.Now().Add(-time.Hour).Unix()
+
+	articles := []*model.Article{
+		{TopicSlug: "go", Slug: "part-2", PublishedAt: past - 100, Metadata: map[string]string{"series": "My Series"}},
+		{TopicSlug: "go", Slug: "part-1", PublishedAt: past - 200, Metadata: map[string]string{"series": "my series"}},
+		{TopicSlug: "rust", Slug: "part-3", PublishedAt: past, Metadata: map[string]string{"series": "my series"}},
+		{TopicSlug: "go", Slug: "other", PublishedAt: past, Metadata: map[string]string{"series": "other series"}},
+		{TopicSlug: "go", Slug: "no-series", PublishedAt: past, Metadata: map[string]string{}},
+	}
+	idx := newTestIndex(nil, articles)
+
+	series := idx.GetArticlesInSeries("my series")
+	require.Len(t, series, 3)
+	assert.Equal(t, "part-1", series[0].Slug)
+	assert.Equal(t, "part-2", series[1].Slug)
+	assert.Equal(t, "part-3", series[2].Slug)
+
+	// case-insensitive lookup
+	require.Len(t, idx.GetArticlesInSeries("MY SERIES"), 3)
+
+	require.Len(t, idx.GetArticlesInSeries("other series"), 1)
+	require.Empty(t, idx.GetArticlesInSeries("missing"))
+}
+
+// verifies that unpublished articles are included in series (future-dated in date
+// order, undated last) while hidden articles are excluded
+func TestGetArticlesInSeries_IncludesUnpublished(t *testing.T) {
+	past := time.Now().Add(-time.Hour).Unix()
+	future := time.Now().Add(time.Hour).Unix()
+
+	articles := []*model.Article{
+		{TopicSlug: "go", Slug: "draft", PublishedAt: 0, Metadata: map[string]string{"series": "s"}},
+		{TopicSlug: "go", Slug: "future", PublishedAt: future, Metadata: map[string]string{"series": "s"}},
+		{TopicSlug: "go", Slug: "published", PublishedAt: past, Metadata: map[string]string{"series": "s"}},
+		{TopicSlug: "go", Slug: "hidden", PublishedAt: past, Hidden: true, Metadata: map[string]string{"series": "s"}},
+	}
+	idx := newTestIndex(nil, articles)
+
+	series := idx.GetArticlesInSeries("s")
+	require.Len(t, series, 3)
+	assert.Equal(t, "published", series[0].Slug)
+	assert.Equal(t, "future", series[1].Slug)
+	assert.Equal(t, "draft", series[2].Slug)
+}
+
 // verifies that GetLastIndexedTime reflects the time at which Reindex was called
 func TestReindex_UpdatesLastIndexedTime(t *testing.T) {
 	before := time.Now()

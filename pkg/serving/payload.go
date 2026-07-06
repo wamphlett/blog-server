@@ -27,9 +27,27 @@ type Article struct {
 	TopicSlug string `json:"topicSlug"`
 }
 
+// SeriesArticle is a lightweight summary of an article within a series
+type SeriesArticle struct {
+	Title       string `json:"title"`
+	Slug        string `json:"slug"`
+	TopicSlug   string `json:"topicSlug"`
+	URL         string `json:"url"`
+	PublishedAt int64  `json:"publishedAt"`
+	Published   bool   `json:"published"`
+}
+
+// Series describes the series an article belongs to and all articles within
+// it (published or not), ordered by published date (oldest first)
+type Series struct {
+	Name     string          `json:"name"`
+	Articles []SeriesArticle `json:"articles"`
+}
+
 type GetArticleResponse struct {
 	Article
 	HtmlResponse
+	Series *Series `json:"series,omitempty"`
 }
 
 type Topic struct {

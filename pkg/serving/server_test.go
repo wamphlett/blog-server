@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"testing"
 	"time"
 
@@ -56,6 +57,24 @@ func (m *mockIndex) GetRecentArticles(limit int) []*model.Article {
 		return all[:limit]
 	}
 	return all
+}
+
+func (m *mockIndex) GetArticlesInSeries(series string) []*model.Article {
+	matches := []*model.Article{}
+	for _, articles := range m.articles {
+		for _, a := range articles {
+			if a.Series() == series && !a.Hidden {
+				matches = append(matches, a)
+			}
+		}
+	}
+	sort.Slice(matches, func(x, y int) bool {
+		if (matches[x].PublishedAt == 0) != (matches[y].PublishedAt == 0) {
+			return matches[y].PublishedAt == 0
+		}
+		return matches[x].PublishedAt < matches[y].PublishedAt
+	})
+	return matches
 }
 
 type mockFileReader struct {
@@ -250,6 +269,58 @@ func TestGetArticle_UnknownArticle(t *testing.T) {
 	w := doRequest(s, http.MethodGet, "/topics/go/articles/missing")
 
 	require.Equal(t, http.StatusNotFound, w.Code)
+}
+
+// verifies that articles in a series include the series payload with all parts
+// (published and unpublished) ordered by published date with a published flag,
+// and articles without a series omit it
+func TestGetArticle_Series(t *testing.T) {
+	past := time.Now().Add(-time.Hour).Unix()
+	idx := &mockIndex{
+		topics: []*model.Topic{
+			{Slug: "go"},
+			{Slug: "rust"},
+		},
+		articles: map[string][]*model.Article{
+			"go": {
+				{TopicSlug: "go", Slug: "part-1", Title: "Part 1", PublishedAt: past - 200, Metadata: map[string]string{"series": "my-series"}},
+				{TopicSlug: "go", Slug: "part-2", Title: "Part 2", PublishedAt: past - 100, Metadata: map[string]string{"series": "my-series"}},
+				{TopicSlug: "go", Slug: "part-4", Title: "Part 4", PublishedAt: 0, Metadata: map[string]string{"series": "my-series"}},
+				{TopicSlug: "go", Slug: "standalone", Title: "Standalone", PublishedAt: past, Metadata: map[string]string{}},
+			},
+			"rust": {
+				{TopicSlug: "rust", Slug: "part-3", Title: "Part 3", PublishedAt: past, Metadata: map[string]string{"series": "my-series"}},
+			},
+		},
+	}
+	s := newTestServer(idx, &mockFileReader{content: "<p>content</p>"})
+
+	// article in a series returns the full series, ordered, across topics,
+	// with unpublished parts included and flagged
+	w := doRequest(s, http.MethodGet, "/topics/go/articles/part-2")
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp GetArticleResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	require.NotNil(t, resp.Series)
+	assert.Equal(t, "my-series", resp.Series.Name)
+	require.Len(t, resp.Series.Articles, 4)
+	assert.Equal(t, "part-1", resp.Series.Articles[0].Slug)
+	assert.Equal(t, "part-2", resp.Series.Articles[1].Slug)
+	assert.Equal(t, "part-3", resp.Series.Articles[2].Slug)
+	assert.Equal(t, "part-4", resp.Series.Articles[3].Slug)
+	assert.Equal(t, "/topics/rust/articles/part-3", resp.Series.Articles[2].URL)
+	assert.True(t, resp.Series.Articles[0].Published)
+	assert.True(t, resp.Series.Articles[2].Published)
+	assert.Equal(t, false, resp.Series.Articles[3].Published)
+
+	// article without a series omits the payload
+	w = doRequest(s, http.MethodGet, "/topics/go/articles/standalone")
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var standalone GetArticleResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&standalone))
+	assert.Nil(t, standalone.Series)
 }
 
 // --- getRecent ---
