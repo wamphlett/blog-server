@@ -69,6 +69,7 @@ func main() {
 		reader,
 		metricsClient,
 		updating.WithRemoteRepository(cfg.ContentRepo),
+		updating.WithBranch(cfg.ContentBranch),
 		updating.WithRefreshInterval(time.Duration(cfg.ContentUpdateIntervalSeconds)*time.Second),
 		// the indexer directly receives the topics and articles every time the content is updated
 		updating.WithReceiver(updateReceiver(cfg.BlogSiteHost, cfg.BlogSiteSecret, database, indexer)),

@@ -44,6 +44,7 @@ type Updater struct {
 	path      string
 	topicFile string
 	repo      string
+	branch    string
 
 	metrics Metrics
 	reader  Reader
@@ -70,6 +71,14 @@ func WithCallback(function func()) Option {
 func WithRemoteRepository(repo string) Option {
 	return func(u *Updater) {
 		u.repo = repo
+	}
+}
+
+// WithBranch defines the branch to checkout after cloning or pulling. If not
+// given, the repository's default branch is used.
+func WithBranch(branch string) Option {
+	return func(u *Updater) {
+		u.branch = branch
 	}
 }
 

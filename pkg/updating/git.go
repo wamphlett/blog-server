@@ -28,7 +28,23 @@ func (u *Updater) updateFromRemote(ctx context.Context, forceFresh bool) error {
 		if err := u.clone(ctx); err != nil {
 			return err
 		}
+
+		// only attempt to change branch if one has been configured
+		if u.branch != "" {
+			if err := u.checkout(ctx); err != nil {
+				return err
+			}
+		}
+
 		return nil
+	}
+
+	// only attempt to change branch if one has been configured, doing this
+	// before pulling ensures the pull always updates the intended branch
+	if u.branch != "" {
+		if err := u.checkout(ctx); err != nil {
+			return err
+		}
 	}
 
 	span.SetAttributes(attribute.String("action", "pull"))
@@ -48,6 +64,27 @@ func (u *Updater) clone(ctx context.Context) error {
 		return err
 	}
 	slog.InfoContext(ctx, "repository cloned", "repo", u.repo)
+	return nil
+}
+
+// checkout changes to the configured branch
+func (u *Updater) checkout(ctx context.Context) error {
+	_, span := tracer.Start(ctx, "update.Checkout")
+	span.SetAttributes(attribute.String("repo", u.repo), attribute.String("branch", u.branch))
+	defer span.End()
+
+	slog.InfoContext(ctx, "checking out branch", "repo", u.repo, "branch", u.branch)
+	cmd := exec.Command("git", "checkout", u.branch)
+	cmd.Env = []string{
+		fmt.Sprintf("GIT_DIR=%s/.git", u.path),
+		fmt.Sprintf("GIT_WORK_TREE=%s", u.path),
+	}
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		slog.ErrorContext(ctx, "git checkout failed", "repo", u.repo, "branch", u.branch, "output", string(out), "error", err)
+		return err
+	}
+	slog.InfoContext(ctx, "branch checked out", "repo", u.repo, "branch", u.branch)
 	return nil
 }
 

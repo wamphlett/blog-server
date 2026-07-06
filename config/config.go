@@ -17,6 +17,7 @@ type Config struct {
 	ServerAllowedOrigins []string `env:"ALLOWED_ORIGINS"`
 	// If specified, the updater will clone and fetch the content from the given remote git repository
 	ContentRepo                  string `env:"CONTENT_REPO"`
+	ContentBranch                string `env:"CONTENT_BRANCH"`
 	ContentUpdateIntervalSeconds int64  `env:"CONTENT_UPDATE_INTERVAL_SECONDS,default=300"`
 	// The directory where the content is stored
 	// This is where any remote repositories will be cloned to
