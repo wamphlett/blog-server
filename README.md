@@ -59,8 +59,41 @@ Article content here...
 | `hidden` | Set to `true` to hide from listings. |
 | `priority` | Integer used for ordering. Higher values rank first. |
 | `image` | Image filename, served from the asset directory. |
+| `series` | Name of the series this article belongs to. See [Series](#series). |
 
 Any unrecognised headers are stored as freeform `metadata` and included in API responses.
+
+### Series
+
+Articles can be grouped into a series by giving them the same `series` header:
+
+```markdown
+<!--
+title: Building a Blog Server, Part 2
+series: building-a-blog-server
+published: 2024-02-01
+-->
+```
+
+Series are global — articles from different topics can belong to the same series. Names are matched case-insensitively.
+
+When fetching a single article that belongs to a series, the response includes a `series` object listing every article in that series (including the requested one), ordered by published date (oldest first, undated articles last). Unpublished articles are included with `"published": false` so upcoming parts can be surfaced (e.g. greyed out) in a UI; hidden articles are excluded entirely.
+
+```json
+{
+  "title": "Building a Blog Server, Part 2",
+  "series": {
+    "name": "building-a-blog-server",
+    "articles": [
+      { "title": "Part 1", "slug": "part-1", "topicSlug": "go", "url": "/topics/go/articles/part-1", "publishedAt": 1704067200, "published": true },
+      { "title": "Part 2", "slug": "part-2", "topicSlug": "go", "url": "/topics/go/articles/part-2", "publishedAt": 1706745600, "published": true },
+      { "title": "Part 3", "slug": "part-3", "topicSlug": "go", "url": "/topics/go/articles/part-3", "publishedAt": 0, "published": false }
+    ]
+  }
+}
+```
+
+Articles without a `series` header omit the field entirely.
 
 ## API
 

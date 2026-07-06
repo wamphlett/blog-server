@@ -53,6 +53,7 @@ type Index struct {
 	articlesByIdentifier map[string]map[string]*model.Article
 	articlesByTime       []*model.Article
 	articlesByURI        map[string]*model.Article
+	articlesBySeries     map[string][]*model.Article
 	urisByFilepath       map[string]string
 
 	// last indexed time
@@ -124,6 +125,16 @@ func (i *Index) GetURIForFile(filepath string) string {
 	return ""
 }
 
+// GetArticlesInSeries returns all articles in the given series, including
+// unpublished ones (but not hidden ones), ordered by published date (oldest
+// first) with undated articles last. Series names are case-insensitive.
+func (i *Index) GetArticlesInSeries(series string) []*model.Article {
+	if articles, ok := i.articlesBySeries[seriesKey(series)]; ok {
+		return articles
+	}
+	return []*model.Article{}
+}
+
 func (i *Index) GetRecentArticles(limit int) []*model.Article {
 	if limit > len(i.articlesByTime) {
 		limit = len(i.articlesByTime)
@@ -145,6 +156,7 @@ func (i *Index) Reindex() {
 	i.indexArticlesByIdentifier(articles)
 	i.indexArticlesByTime(articles)
 	i.indexArticlesByURI(articles)
+	i.indexArticlesBySeries(articles)
 	i.indexByURIsByFilepath(topics, articles)
 
 	i.lastIndexed = startTime
@@ -191,6 +203,37 @@ func (i *Index) indexArticlesByURI(articles []*model.Article) {
 	for _, article := range articles {
 		i.articlesByURI[strings.TrimLeft(filepath.Join(article.TopicSlug, article.Slug), "/")] = article
 	}
+}
+
+// indexArticlesBySeries groups articles by their series name, ordered by
+// published date (oldest first) with undated articles last. Unpublished
+// articles are included so upcoming parts can be surfaced; hidden articles
+// are excluded.
+func (i *Index) indexArticlesBySeries(articles []*model.Article) {
+	i.articlesBySeries = make(map[string][]*model.Article)
+	for _, article := range articles {
+		series := article.Series()
+		if series == "" || article.Hidden {
+			continue
+		}
+		key := seriesKey(series)
+		i.articlesBySeries[key] = append(i.articlesBySeries[key], article)
+	}
+
+	for _, articles := range i.articlesBySeries {
+		sort.Slice(articles, func(x, y int) bool {
+			// undated articles sort last
+			if (articles[x].PublishedAt == 0) != (articles[y].PublishedAt == 0) {
+				return articles[y].PublishedAt == 0
+			}
+			return articles[x].PublishedAt < articles[y].PublishedAt
+		})
+	}
+}
+
+// seriesKey normalises a series name so lookups are case-insensitive
+func seriesKey(series string) string {
+	return strings.ToLower(strings.TrimSpace(series))
 }
 
 // indexFilePaths indexes entries by their filepath on disk

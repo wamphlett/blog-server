@@ -24,3 +24,9 @@ type Article struct {
 func (a *Article) IsPublished() bool {
 	return a.PublishedAt > 0 && !a.Hidden && a.PublishedAt < time.Now().Unix()
 }
+
+// Series returns the name of the series this article belongs to,
+// or an empty string if the article is not part of a series
+func (a *Article) Series() string {
+	return a.Metadata["series"]
+}
