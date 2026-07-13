@@ -5,4 +5,22 @@ services:
       context: .
       dockerfile: ./Dockerfile
     ports:
-      - "3110:3000"
+      - "${HOST_PORT:-3110}:${PORT:-3000}"
+    environment:
+      PORT: "${PORT:-3000}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-}"
+      ENVIRONMENT: "${ENVIRONMENT:-development}"
+      CONTENT_PATH: "${CONTENT_PATH:-./content}"
+      CONTENT_REPO: "${CONTENT_REPO:-}"
+      CONTENT_BRANCH: "${CONTENT_BRANCH:-}"
+      CONTENT_UPDATE_INTERVAL_SECONDS: "${CONTENT_UPDATE_INTERVAL_SECONDS:-300}"
+      CONTENT_ASSET_DIR: "${CONTENT_ASSET_DIR:-images}"
+      STATIC_ASSET_URL: "${STATIC_ASSET_URL:-images}"
+      TOPIC_FILE: "${TOPIC_FILE:-README.md}"
+      BLOG_SITE_HOST: "${BLOG_SITE_HOST:-}"
+      BLOG_SITE_SECRET: "${BLOG_SITE_SECRET:-}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      LOG_FORMAT: "${LOG_FORMAT:-json}"
+      SENTRY_DSN: "${SENTRY_DSN:-}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "${OTEL_EXPORTER_OTLP_ENDPOINT:-}"
+      OTEL_SERVICE_NAME: "${OTEL_SERVICE_NAME:-blog-server}"

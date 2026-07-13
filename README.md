@@ -192,3 +192,25 @@ Pass a local content directory by mounting it as a volume:
 ```bash
 docker run -p 3000:3000 -v /path/to/content:/content -e CONTENT_PATH=/content blog-server
 ```
+
+### docker-compose
+
+`docker-compose.yaml` reads its configuration from a `.env` file in the repo root (falling back to the defaults above for anything unset).
+
+Easiest way to configure and start it:
+
+```bash
+./scripts/run.sh
+```
+
+The first time you run it, it prompts for each setting (showing defaults in brackets — press enter to accept) and writes `.env`. On every run after that, it finds the existing `.env` and starts straight away with no prompts.
+
+Other useful modes:
+
+```bash
+./scripts/run.sh --reconfigure # re-prompt for every setting, even though .env exists
+./scripts/run.sh --configure   # just write/update .env, don't start the server
+./scripts/run.sh --yes         # never prompt (first run uses defaults), then run
+```
+
+Alternatively, copy `.env.example` to `.env` and edit it by hand, then run `docker compose up --build` directly.
