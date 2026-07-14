@@ -57,11 +57,17 @@ Article content here...
 | `published` | Publish date (`YYYY-MM-DD`). Articles without this are not returned as published. |
 | `updated` | Last updated date (`YYYY-MM-DD`). |
 | `hidden` | Set to `true` to hide from listings. |
-| `priority` | Integer used for ordering. Higher values rank first. |
+| `priority` | Integer used to order articles within a series that share the same published date (most commonly undated, upcoming parts). Higher values rank first. See [Series](#series). |
 | `image` | Image filename, served from the asset directory. |
 | `series` | Name of the series this article belongs to. See [Series](#series). |
 
 Any unrecognised headers are stored as freeform `metadata` and included in API responses.
+
+### Article ordering
+
+A topic's articles (`/topics/{topic}/articles`) and the recent articles feed (`/recent`) are always ordered newest published first, with undated articles last. When articles tie on published date — most commonly a group of undated, upcoming articles — they're ordered by creation date (newest first), falling back to slug as a final, fully deterministic tiebreak.
+
+Creation date is read from the git history of the content repository (the timestamp of the commit that first added the file), not filesystem metadata, so it stays correct across re-clones and deployments. If the content directory isn't backed by git, or a file has no history yet, it falls back straight to the slug tiebreak.
 
 ### Series
 

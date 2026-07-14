@@ -60,6 +60,7 @@ type Index struct {
 	// indexes
 	topicsByIdentifier   map[string]*model.Topic
 	articlesByIdentifier map[string]map[string]*model.Article
+	articlesByTopic      map[string][]*model.Article
 	articlesByTime       []*model.Article
 	articlesByURI        map[string]*model.Article
 	articlesBySeries     map[string][]*model.Article
@@ -116,17 +117,13 @@ func (i *Index) GetAllTopics() []*model.Topic {
 	return topics
 }
 
+// GetAllArticlesForTopic returns all articles for the given topic, ordered
+// newest published first, with undated articles last.
 func (i *Index) GetAllArticlesForTopic(topicIdentifier string) []*model.Article {
-	if _, ok := i.articlesByIdentifier[topicIdentifier]; !ok {
-		return []*model.Article{}
+	if articles, ok := i.articlesByTopic[topicIdentifier]; ok {
+		return articles
 	}
-
-	articles := make([]*model.Article, 0, len(i.articlesByIdentifier[topicIdentifier]))
-	for _, article := range i.articlesByIdentifier[topicIdentifier] {
-		articles = append(articles, article)
-	}
-
-	return articles
+	return []*model.Article{}
 }
 
 // GetURIForFile returns the URI used by the file at the given path
@@ -166,6 +163,7 @@ func (i *Index) Reindex() {
 
 	i.indexTopicsByIdentifier(topics)
 	i.indexArticlesByIdentifier(articles)
+	i.indexArticlesByTopic(articles)
 	i.indexArticlesByTime(articles)
 	i.indexArticlesByURI(articles)
 	i.indexArticlesBySeries(articles)
@@ -191,7 +189,7 @@ func (i *Index) indexArticlesByTime(articles []*model.Article) {
 	}
 
 	sort.Slice(i.articlesByTime, func(x, y int) bool {
-		return i.articlesByTime[y].PublishedAt < i.articlesByTime[x].PublishedAt
+		return lessRecent(i.articlesByTime[x], i.articlesByTime[y])
 	})
 }
 
@@ -209,6 +207,38 @@ func (i *Index) indexArticlesByIdentifier(articles []*model.Article) {
 			i.articlesByIdentifier[article.TopicSlug] = make(map[string]*model.Article)
 		}
 		i.articlesByIdentifier[article.TopicSlug][article.Slug] = article
+	}
+}
+
+// lessRecent orders articles newest published first, with undated articles
+// last. Ties (most commonly a group of undated articles) are broken by
+// creation date (newest first), then by slug as a final deterministic
+// fallback when the creation date is also unknown or equal.
+func lessRecent(a, b *model.Article) bool {
+	if (a.PublishedAt == 0) != (b.PublishedAt == 0) {
+		return b.PublishedAt == 0
+	}
+	if a.PublishedAt != b.PublishedAt {
+		return a.PublishedAt > b.PublishedAt
+	}
+	if a.CreatedAt != b.CreatedAt {
+		return a.CreatedAt > b.CreatedAt
+	}
+	return a.Slug < b.Slug
+}
+
+// indexArticlesByTopic groups articles by topic, ordered newest published
+// first with undated articles last (see lessRecent).
+func (i *Index) indexArticlesByTopic(articles []*model.Article) {
+	i.articlesByTopic = make(map[string][]*model.Article)
+	for _, article := range articles {
+		i.articlesByTopic[article.TopicSlug] = append(i.articlesByTopic[article.TopicSlug], article)
+	}
+
+	for _, articles := range i.articlesByTopic {
+		sort.Slice(articles, func(x, y int) bool {
+			return lessRecent(articles[x], articles[y])
+		})
 	}
 }
 

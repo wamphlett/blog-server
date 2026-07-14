@@ -87,6 +87,49 @@ func TestGetAllArticlesForTopic(t *testing.T) {
 	require.Empty(t, idx.GetAllArticlesForTopic("missing"))
 }
 
+// verifies that a topic's articles are always ordered newest published first, with
+// undated articles last and ties broken by slug for a deterministic order
+func TestGetAllArticlesForTopic_OrderedByPublishedAtDesc(t *testing.T) {
+	now := time.Now().Unix()
+
+	articles := []*model.Article{
+		{TopicSlug: "go", Slug: "oldest", PublishedAt: now - 2000},
+		{TopicSlug: "go", Slug: "undated-b", PublishedAt: 0},
+		{TopicSlug: "go", Slug: "newest", PublishedAt: now - 1000},
+		{TopicSlug: "go", Slug: "undated-a", PublishedAt: 0},
+	}
+	idx := newTestIndex(nil, articles)
+
+	goArticles := idx.GetAllArticlesForTopic("go")
+	require.Len(t, goArticles, 4)
+	assert.Equal(t, "newest", goArticles[0].Slug)
+	assert.Equal(t, "oldest", goArticles[1].Slug)
+	assert.Equal(t, "undated-a", goArticles[2].Slug)
+	assert.Equal(t, "undated-b", goArticles[3].Slug)
+}
+
+// verifies that undated articles are ordered by creation date (newest first) rather
+// than falling back straight to slug, and that slug is still used as a final
+// tiebreak when creation date is also equal or unknown
+func TestGetAllArticlesForTopic_UndatedOrderedByCreatedAt(t *testing.T) {
+	now := time.Now().Unix()
+
+	articles := []*model.Article{
+		{TopicSlug: "go", Slug: "z-oldest-draft", PublishedAt: 0, CreatedAt: now - 3000},
+		{TopicSlug: "go", Slug: "a-newest-draft", PublishedAt: 0, CreatedAt: now - 1000},
+		{TopicSlug: "go", Slug: "b-no-created-at", PublishedAt: 0, CreatedAt: 0},
+		{TopicSlug: "go", Slug: "a-no-created-at", PublishedAt: 0, CreatedAt: 0},
+	}
+	idx := newTestIndex(nil, articles)
+
+	goArticles := idx.GetAllArticlesForTopic("go")
+	require.Len(t, goArticles, 4)
+	assert.Equal(t, "a-newest-draft", goArticles[0].Slug)
+	assert.Equal(t, "z-oldest-draft", goArticles[1].Slug)
+	assert.Equal(t, "a-no-created-at", goArticles[2].Slug)
+	assert.Equal(t, "b-no-created-at", goArticles[3].Slug)
+}
+
 // verifies that the index maps file paths to their URIs for both topics and articles, and returns empty string for unknown paths
 func TestGetURIForFile(t *testing.T) {
 	topics := []*model.Topic{
@@ -179,6 +222,23 @@ func TestGetRecentArticles_StagingModeIncludesUnpublished(t *testing.T) {
 		slugs[i] = a.Slug
 	}
 	assert.ElementsMatch(t, []string{"published", "future", "no-date"}, slugs)
+}
+
+// verifies that in staging mode, undated articles in the recent feed are ordered by
+// creation date (newest first) instead of scattering unpredictably
+func TestGetRecentArticles_StagingModeUndatedOrderedByCreatedAt(t *testing.T) {
+	now := time.Now().Unix()
+
+	articles := []*model.Article{
+		{TopicSlug: "go", Slug: "older-draft", PublishedAt: 0, CreatedAt: now - 2000},
+		{TopicSlug: "go", Slug: "newer-draft", PublishedAt: 0, CreatedAt: now - 1000},
+	}
+	idx := newTestIndex(nil, articles, indexing.WithStagingMode(true))
+
+	recent := idx.GetRecentArticles(10)
+	require.Len(t, recent, 2)
+	assert.Equal(t, "newer-draft", recent[0].Slug)
+	assert.Equal(t, "older-draft", recent[1].Slug)
 }
 
 // verifies that articles in a series are returned ordered by published date (oldest

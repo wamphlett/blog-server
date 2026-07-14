@@ -6,6 +6,9 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -86,6 +89,40 @@ func (u *Updater) checkout(ctx context.Context) error {
 	}
 	slog.InfoContext(ctx, "branch checked out", "repo", u.repo, "branch", u.branch)
 	return nil
+}
+
+// fileCreatedAt returns the unix timestamp of the commit that first added
+// filePath to the repository rooted at u.path. It returns 0 if the timestamp
+// cannot be determined, e.g. the content directory isn't a git repository or
+// the file isn't tracked - callers should treat that as "unknown" rather
+// than a real creation time.
+func (u *Updater) fileCreatedAt(ctx context.Context, filePath string) int64 {
+	_, span := tracer.Start(ctx, "update.FileCreatedAt")
+	defer span.End()
+
+	relPath, err := filepath.Rel(u.path, filePath)
+	if err != nil {
+		return 0
+	}
+
+	cmd := exec.Command("git", "-C", u.path, "log", "--follow", "--format=%at", "--", relPath)
+	out, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+
+	commitTimes := strings.Fields(string(out))
+	if len(commitTimes) == 0 {
+		return 0
+	}
+
+	// git log lists newest first, so the last entry is the file's first commit
+	createdAt, err := strconv.ParseInt(commitTimes[len(commitTimes)-1], 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	return createdAt
 }
 
 // pull does a git pull from the remote repository

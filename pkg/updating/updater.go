@@ -236,6 +236,7 @@ func (u *Updater) readFiles(ctx context.Context) ([]*model.Topic, []*model.Artic
 			if !ok || checksum != previousChecksum {
 				// there have been changes to this file
 				article := u.reader.LoadArticleFromFile(articleFilepath, topic.Slug)
+				article.CreatedAt = u.fileCreatedAt(ctx, articleFilepath)
 				articles = append(articles, article)
 			}
 

@@ -17,8 +17,13 @@ type Article struct {
 
 	PublishedAt int64
 	UpdatedAt   int64
-	Priority    int64
-	Metadata    map[string]string
+	// CreatedAt is the timestamp of the commit that first added this file to
+	// the content repository, used to order undated articles when no
+	// published date is available. It is 0 if the content isn't backed by a
+	// git repository or the timestamp couldn't be determined.
+	CreatedAt int64
+	Priority  int64
+	Metadata  map[string]string
 }
 
 func (a *Article) IsPublished() bool {
