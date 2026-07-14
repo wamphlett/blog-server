@@ -221,7 +221,10 @@ func (i *Index) indexArticlesByURI(articles []*model.Article) {
 }
 
 // indexArticlesBySeries groups articles by their series name, ordered by
-// published date (oldest first) with undated articles last. Unpublished
+// published date (oldest first) with undated articles last. Articles that
+// share a date (most commonly a group of undated, upcoming articles) are
+// then ordered by priority (highest first), then by slug so the order is
+// fully deterministic regardless of database iteration order. Unpublished
 // articles are included so upcoming parts can be surfaced; hidden articles
 // are excluded.
 func (i *Index) indexArticlesBySeries(articles []*model.Article) {
@@ -237,11 +240,19 @@ func (i *Index) indexArticlesBySeries(articles []*model.Article) {
 
 	for _, articles := range i.articlesBySeries {
 		sort.Slice(articles, func(x, y int) bool {
+			a, b := articles[x], articles[y]
+
 			// undated articles sort last
-			if (articles[x].PublishedAt == 0) != (articles[y].PublishedAt == 0) {
-				return articles[y].PublishedAt == 0
+			if (a.PublishedAt == 0) != (b.PublishedAt == 0) {
+				return b.PublishedAt == 0
 			}
-			return articles[x].PublishedAt < articles[y].PublishedAt
+			if a.PublishedAt != b.PublishedAt {
+				return a.PublishedAt < b.PublishedAt
+			}
+			if a.Priority != b.Priority {
+				return a.Priority > b.Priority
+			}
+			return a.Slug < b.Slug
 		})
 	}
 }
