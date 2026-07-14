@@ -15,6 +15,10 @@ type Config struct {
 	Environment          string   `env:"ENVIRONMENT,default=development"`
 	ServerPort           int      `env:"PORT,default=3000"`
 	ServerAllowedOrigins []string `env:"ALLOWED_ORIGINS"`
+	// When true, unpublished (future-dated or undated) articles are included
+	// in the /recent feed. Intended for a staging deployment so posts can be
+	// previewed before they go live on the public site.
+	StagingMode bool `env:"STAGING_MODE,default=false"`
 	// If specified, the updater will clone and fetch the content from the given remote git repository
 	ContentRepo                  string `env:"CONTENT_REPO"`
 	ContentBranch                string `env:"CONTENT_BRANCH"`

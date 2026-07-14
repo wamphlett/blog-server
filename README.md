@@ -120,6 +120,7 @@ All configuration is via environment variables.
 | `PORT` | `3000` | Port to listen on. |
 | `ALLOWED_ORIGINS` | _(none)_ | Comma-separated list of allowed CORS origins. |
 | `ENVIRONMENT` | `development` | Environment name. |
+| `STAGING_MODE` | `false` | When `true`, unpublished (future-dated or undated) articles are included in the `/recent` feed, so drafts can be previewed before going live. Hidden articles are always excluded. Run a separate instance with this enabled to use as a staging preview. |
 
 ### Content
 

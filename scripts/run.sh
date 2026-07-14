@@ -52,6 +52,7 @@ else
     "HOST_PORT|3110|Host port to expose the server on"
     "PORT|3000|Port the server listens on inside the container"
     "ENVIRONMENT|development|Environment name"
+    "STAGING_MODE|false|Show unpublished articles in the recent feed (true/false)"
     "ALLOWED_ORIGINS||Comma-separated list of allowed CORS origins"
     "CONTENT_PATH|./content|Path to the content directory"
     "CONTENT_REPO||Remote git repo to clone content from (leave blank for local content)"

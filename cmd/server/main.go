@@ -57,7 +57,7 @@ func main() {
 	database := memorydatabase.New()
 
 	// create a new indexer
-	indexer := indexing.NewIndex(database, metricsClient)
+	indexer := indexing.NewIndex(database, metricsClient, indexing.WithStagingMode(cfg.StagingMode))
 
 	// create a new reader
 	reader := reading.New(indexer, cfg.StaticAssetsURL, cfg.ContentAssetDir, metricsClient)

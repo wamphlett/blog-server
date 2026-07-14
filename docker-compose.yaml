@@ -10,6 +10,7 @@ services:
       PORT: "${PORT:-3000}"
       ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-}"
       ENVIRONMENT: "${ENVIRONMENT:-development}"
+      STAGING_MODE: "${STAGING_MODE:-false}"
       CONTENT_PATH: "${CONTENT_PATH:-./content}"
       CONTENT_REPO: "${CONTENT_REPO:-}"
       CONTENT_BRANCH: "${CONTENT_BRANCH:-}"

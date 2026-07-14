@@ -159,6 +159,28 @@ func TestGetRecentArticles_ExcludesUnpublished(t *testing.T) {
 	assert.Equal(t, "published", recent[0].Slug)
 }
 
+// verifies that staging mode includes future-dated and undated articles in recent
+// results, but still excludes hidden articles
+func TestGetRecentArticles_StagingModeIncludesUnpublished(t *testing.T) {
+	now := time.Now().Unix()
+	future := time.Now().Add(time.Hour).Unix()
+
+	articles := []*model.Article{
+		{TopicSlug: "go", Slug: "published", PublishedAt: now - 3600},
+		{TopicSlug: "go", Slug: "future", PublishedAt: future},
+		{TopicSlug: "go", Slug: "hidden", PublishedAt: now - 3600, Hidden: true},
+		{TopicSlug: "go", Slug: "no-date", PublishedAt: 0},
+	}
+	idx := newTestIndex(nil, articles, indexing.WithStagingMode(true))
+
+	recent := idx.GetRecentArticles(10)
+	slugs := make([]string, len(recent))
+	for i, a := range recent {
+		slugs[i] = a.Slug
+	}
+	assert.ElementsMatch(t, []string{"published", "future", "no-date"}, slugs)
+}
+
 // verifies that articles in a series are returned ordered by published date (oldest
 // first), grouped globally across topics, with case-insensitive series names
 func TestGetArticlesInSeries(t *testing.T) {

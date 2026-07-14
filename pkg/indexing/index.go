@@ -31,6 +31,15 @@ func WithReindexedCallback(callback ReindexedCallback) Option {
 	}
 }
 
+// WithStagingMode controls whether unpublished (future-dated or undated)
+// articles are included in the recent articles feed. Hidden articles are
+// always excluded regardless of this setting.
+func WithStagingMode(stagingMode bool) Option {
+	return func(i *Index) {
+		i.stagingMode = stagingMode
+	}
+}
+
 // Metrics defines the metrics used by the index
 type Metrics interface {
 	Indexed(ctx context.Context, startTime time.Time, topicCount, articleCount int)
@@ -58,6 +67,9 @@ type Index struct {
 
 	// last indexed time
 	lastIndexed time.Time
+
+	// when true, unpublished articles are included in the recent articles feed
+	stagingMode bool
 
 	database Database
 	metrics  Metrics
@@ -169,7 +181,10 @@ func (i *Index) indexArticlesByTime(articles []*model.Article) {
 	i.articlesByTime = []*model.Article{}
 
 	for _, article := range articles {
-		if !article.IsPublished() {
+		if article.Hidden {
+			continue
+		}
+		if !i.stagingMode && !article.IsPublished() {
 			continue
 		}
 		i.articlesByTime = append(i.articlesByTime, article)
