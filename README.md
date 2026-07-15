@@ -57,7 +57,7 @@ Article content here...
 | `published` | Publish date (`YYYY-MM-DD`). Articles without this are not returned as published. |
 | `updated` | Last updated date (`YYYY-MM-DD`). |
 | `hidden` | Set to `true` to hide from listings. |
-| `priority` | Integer used to order articles within a series that share the same published date (most commonly undated, upcoming parts). Higher values rank first. See [Series](#series). |
+| `priority` | Integer used to order articles within a series that share the same published date (most commonly undated, upcoming parts). Lower values rank first, matching reading order (e.g. part 3 before part 4). See [Series](#series). |
 | `image` | Image filename, served from the asset directory. |
 | `series` | Name of the series this article belongs to. See [Series](#series). |
 

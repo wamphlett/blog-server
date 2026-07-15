@@ -290,12 +290,13 @@ func TestGetArticlesInSeries_IncludesUnpublished(t *testing.T) {
 }
 
 // verifies that articles sharing the same published date (most commonly a group of
-// undated, upcoming articles) are ordered by priority (highest first), then by slug,
-// so the order is deterministic instead of depending on database iteration order
+// undated, upcoming articles) are ordered by priority (lowest first, matching
+// reading order), then by slug, so the order is deterministic instead of depending
+// on database iteration order
 func TestGetArticlesInSeries_TiesBrokenByPriorityThenSlug(t *testing.T) {
 	articles := []*model.Article{
-		{TopicSlug: "go", Slug: "no-priority-b", PublishedAt: 0, Priority: 0, Metadata: map[string]string{"series": "s"}},
 		{TopicSlug: "go", Slug: "high-priority", PublishedAt: 0, Priority: 10, Metadata: map[string]string{"series": "s"}},
+		{TopicSlug: "go", Slug: "no-priority-b", PublishedAt: 0, Priority: 0, Metadata: map[string]string{"series": "s"}},
 		{TopicSlug: "go", Slug: "no-priority-a", PublishedAt: 0, Priority: 0, Metadata: map[string]string{"series": "s"}},
 		{TopicSlug: "go", Slug: "mid-priority", PublishedAt: 0, Priority: 5, Metadata: map[string]string{"series": "s"}},
 	}
@@ -303,10 +304,10 @@ func TestGetArticlesInSeries_TiesBrokenByPriorityThenSlug(t *testing.T) {
 
 	series := idx.GetArticlesInSeries("s")
 	require.Len(t, series, 4)
-	assert.Equal(t, "high-priority", series[0].Slug)
-	assert.Equal(t, "mid-priority", series[1].Slug)
-	assert.Equal(t, "no-priority-a", series[2].Slug)
-	assert.Equal(t, "no-priority-b", series[3].Slug)
+	assert.Equal(t, "no-priority-a", series[0].Slug)
+	assert.Equal(t, "no-priority-b", series[1].Slug)
+	assert.Equal(t, "mid-priority", series[2].Slug)
+	assert.Equal(t, "high-priority", series[3].Slug)
 }
 
 // verifies that priority is only used as a tiebreaker: when articles have distinct
@@ -327,20 +328,20 @@ func TestGetArticlesInSeries_DateOrderIgnoresPriorityWhenDatesDiffer(t *testing.
 }
 
 // verifies that priority breaks ties between articles published on the exact same
-// timestamp
+// timestamp, lowest priority first
 func TestGetArticlesInSeries_SameDatePriorityTiebreak(t *testing.T) {
 	same := time.Now().Add(-time.Hour).Unix()
 
 	articles := []*model.Article{
-		{TopicSlug: "go", Slug: "low-priority", PublishedAt: same, Priority: 1, Metadata: map[string]string{"series": "s"}},
 		{TopicSlug: "go", Slug: "high-priority", PublishedAt: same, Priority: 2, Metadata: map[string]string{"series": "s"}},
+		{TopicSlug: "go", Slug: "low-priority", PublishedAt: same, Priority: 1, Metadata: map[string]string{"series": "s"}},
 	}
 	idx := newTestIndex(nil, articles)
 
 	series := idx.GetArticlesInSeries("s")
 	require.Len(t, series, 2)
-	assert.Equal(t, "high-priority", series[0].Slug)
-	assert.Equal(t, "low-priority", series[1].Slug)
+	assert.Equal(t, "low-priority", series[0].Slug)
+	assert.Equal(t, "high-priority", series[1].Slug)
 }
 
 // verifies that GetLastIndexedTime reflects the time at which Reindex was called
